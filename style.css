@@ -216,6 +216,11 @@ body {
   opacity: 0.25;
 }
 
+.calibration-overlay[data-state='collecting'] .calibration-target {
+  cursor: wait;
+  transform: translate(-50%, -50%) scale(0.9);
+}
+
 @media (prefers-color-scheme: light) {
   :root {
     --bg-primary: #e9edf8;

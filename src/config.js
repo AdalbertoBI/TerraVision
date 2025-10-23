@@ -1,6 +1,6 @@
 export const APP_CONFIG = {
   dwellDuration: 1300,
-  minConfidence: 0.55,
+  minConfidence: 0.45,
   notesEndpoint: 'notes.json',
   blinkThreshold: 0.22,
   blinkMinDuration: 80,

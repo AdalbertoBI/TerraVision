@@ -58,19 +58,14 @@ export class CalibrationManager {
   async calibrate() {
     const overlay = this.buildOverlay();
     this.stageEl.appendChild(overlay);
-  this.announce?.('Mire o olhar no alvo indicado e clique para registrar cada ponto.');
+    this.announce?.('Mire o olhar no alvo indicado e clique para registrar cada ponto.');
 
     const offsets = [];
-    const failures = [];
 
     for (const [index, point] of CALIBRATION_POINTS.entries()) {
       this.updateInstruction(overlay, `Ponto ${index + 1} de ${CALIBRATION_POINTS.length}. Clique no alvo.`);
       const sample = await this.collectPoint(overlay, point);
-      if (sample) {
-        offsets.push(sample);
-      } else {
-        failures.push(point);
-      }
+      offsets.push(sample);
     }
 
     overlay.remove();
@@ -95,11 +90,6 @@ export class CalibrationManager {
 
     this.persistOffset();
 
-    if (failures.length) {
-      this.announce?.('Calibração concluída com avisos. Repita se notar imprecisão.');
-      return { success: true, warnings: failures.length };
-    }
-
     this.announce?.('Calibração concluída com sucesso.');
     return { success: true, warnings: 0 };
   }
@@ -110,7 +100,7 @@ export class CalibrationManager {
 
     const instruction = document.createElement('p');
     instruction.className = 'calibration-instruction';
-  instruction.textContent = 'Olhe para o alvo e clique para registrar.';
+    instruction.textContent = 'Olhe para o alvo e clique para registrar.';
 
     const marker = document.createElement('button');
     marker.type = 'button';
@@ -142,21 +132,59 @@ export class CalibrationManager {
     overlay.dataset.state = 'active';
 
     return new Promise((resolve) => {
-      const handleClick = () => {
-        const gaze = this.getGaze?.();
-        if (!gaze) {
-          this.updateInstruction(overlay, 'Olhar não detectado. Mantenha o olhar e clique novamente.');
-          overlay.dataset.state = 'active';
-          return;
-        }
-
-        const offset = { x: gaze.x - targetX, y: gaze.y - targetY };
-        overlay.dataset.state = 'cooldown';
+      const handleClick = (event) => {
+        event.preventDefault();
         marker.removeEventListener('click', handleClick);
-        resolve(offset);
+
+        overlay.dataset.state = 'collecting';
+        marker.disabled = true;
+        this.updateInstruction(overlay, 'Mantenha o olhar no alvo. Coletando dados...');
+
+        const samples = [];
+        const start = performance.now();
+
+        const gather = () => {
+          const gaze = this.getGaze?.();
+          if (gaze && Number.isFinite(gaze.x) && Number.isFinite(gaze.y)) {
+            samples.push({ x: gaze.x - targetX, y: gaze.y - targetY });
+          }
+
+          const elapsed = performance.now() - start;
+          if (samples.length >= this.minSamplesPerPoint || elapsed >= this.sampleWindow) {
+            marker.disabled = false;
+
+            if (!samples.length) {
+              overlay.dataset.state = 'active';
+              this.updateInstruction(overlay, 'Não registramos o olhar. Ajuste sua posição e clique novamente.');
+              marker.addEventListener('click', handleClick, { once: true });
+              return;
+            }
+
+            const averaged = samples.reduce(
+              (acc, sample) => {
+                acc.x += sample.x;
+                acc.y += sample.y;
+                return acc;
+              },
+              { x: 0, y: 0 }
+            );
+
+            averaged.x /= samples.length;
+            averaged.y /= samples.length;
+
+            overlay.dataset.state = 'cooldown';
+            this.updateInstruction(overlay, 'Ponto registrado!');
+            resolve(averaged);
+            return;
+          }
+
+          requestAnimationFrame(gather);
+        };
+
+        requestAnimationFrame(gather);
       };
 
-      marker.addEventListener('click', handleClick);
+      marker.addEventListener('click', handleClick, { once: true });
     });
   }
 }

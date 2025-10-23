@@ -22,6 +22,7 @@ class TerraVisionCore {
     this.isTracking = false;
     this.isCalibrating = false;
     this.calibrationOffset = { x: 0, y: 0 };
+    this.autoStartRegistered = false;
 
     this.handleGaze = this.handleGaze.bind(this);
     this.handleBlink = this.handleBlink.bind(this);
@@ -61,6 +62,11 @@ class TerraVisionCore {
     if (!this.warnIfInsecureContext()) {
       this.ui.updateStatus('Olhe para a pizza colorida e use o alvo central para calibrar quando desejar.');
     }
+
+    const trackingStarted = await this.startTracking();
+    if (!trackingStarted) {
+      this.registerAutoStartFallback();
+    }
   }
 
   warnIfInsecureContext() {
@@ -92,6 +98,26 @@ class TerraVisionCore {
     });
   }
 
+  registerAutoStartFallback() {
+    if (this.autoStartRegistered || this.isTracking) {
+      return;
+    }
+
+    this.autoStartRegistered = true;
+    this.ui.updateStatus('Autorize o acesso à câmera. Se o aviso não aparecer, clique ou toque na tela para tentar novamente.');
+
+    const handleInteraction = async () => {
+      document.removeEventListener('pointerdown', handleInteraction);
+      this.autoStartRegistered = false;
+      const started = await this.startTracking();
+      if (!started) {
+        this.registerAutoStartFallback();
+      }
+    };
+
+    document.addEventListener('pointerdown', handleInteraction, { once: true });
+  }
+
   setupResizeHandling() {
     window.addEventListener('resize', () => {
       this.renderer?.resize();
@@ -101,7 +127,7 @@ class TerraVisionCore {
 
   async loadNotes() {
     try {
-  const response = await fetch(APP_CONFIG.notesEndpoint, { cache: 'no-store' });
+      const response = await fetch(APP_CONFIG.notesEndpoint, { cache: 'no-store' });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -139,6 +165,10 @@ class TerraVisionCore {
     this.ui.updateStatus('Ativando rastreamento ocular. Permita o acesso à câmera quando solicitado.');
 
     try {
+      const hasWebGazer = await this.waitForWebGazer();
+      if (!hasWebGazer) {
+        throw new Error('WebGazer não carregou.');
+      }
       await this.requestCameraPermission();
       await this.audio.ensureRunning();
 
@@ -153,9 +183,28 @@ class TerraVisionCore {
     } catch (error) {
       console.error('Falha ao iniciar rastreamento:', error);
       this.isTracking = false;
-      this.ui.updateStatus('Não foi possível acessar a câmera. Verifique permissões e tente novamente.');
+      if (error?.message?.includes('WebGazer')) {
+        this.ui.updateStatus('Ainda estamos carregando o WebGazer. Aguarde alguns segundos ou recarregue a página.');
+      } else {
+        this.ui.updateStatus('Não foi possível acessar a câmera. Verifique permissões e tente novamente.');
+      }
       return false;
     }
+  }
+
+  async waitForWebGazer(timeout = 6000) {
+    if (window.webgazer) {
+      return true;
+    }
+
+    const start = performance.now();
+    while (performance.now() - start < timeout) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if (window.webgazer) {
+        return true;
+      }
+    }
+    return Boolean(window.webgazer);
   }
 
   applyCalibrationOffset() {
@@ -266,6 +315,7 @@ class TerraVisionCore {
           if (!this.isTracking) {
             const started = await this.startTracking();
             if (!started) {
+              this.registerAutoStartFallback();
               return;
             }
           }
