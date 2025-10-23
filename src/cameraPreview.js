@@ -7,6 +7,8 @@ const DEFAULT_FILTERS = {
   invert: 0
 };
 
+const DEFAULT_DIGITAL_ZOOM = 1.75;
+
 const DEFAULT_CONSTRAINTS = {
   video: {
     facingMode: 'user',
@@ -42,6 +44,10 @@ export class CameraPreview {
     this.filters = { ...DEFAULT_FILTERS };
     this.statsTimer = null;
     this.frameRequest = null;
+    this.baseTransform = 'scaleX(-1)';
+    this.presentationZoom = 1;
+    this.digitalZoomFallback = DEFAULT_DIGITAL_ZOOM;
+    this.#applyPresentationZoom();
   }
 
   async start() {
@@ -172,22 +178,24 @@ export class CameraPreview {
       z-index: 7;
       pointer-events: none;
       object-fit: cover;
-      transform: scaleX(-1);
       background: #000;
       opacity: 0;
       transition: opacity 0.4s ease;
     `;
+    video.style.transformOrigin = 'center';
     return video;
   }
 
   async #optimizeTrackSettings(stream) {
     const [videoTrack] = stream?.getVideoTracks?.() ?? [];
     if (!videoTrack?.getCapabilities || !videoTrack?.applyConstraints) {
+      this.#applyPresentationZoom(this.digitalZoomFallback);
       return;
     }
 
     const capabilities = videoTrack.getCapabilities();
     const advancedSettings = {};
+    let usedOpticalZoom = false;
 
     if (Array.isArray(capabilities.focusMode)) {
       if (capabilities.focusMode.includes('continuous')) {
@@ -215,17 +223,46 @@ export class CameraPreview {
         } else {
           advancedSettings.zoom = desired;
         }
+        usedOpticalZoom = true;
       }
     }
 
     if (!Object.keys(advancedSettings).length) {
+      this.#applyPresentationZoom(this.digitalZoomFallback);
       return;
     }
 
     try {
       await videoTrack.applyConstraints({ advanced: [advancedSettings] });
+      if (advancedSettings.zoom && videoTrack.getSettings) {
+        const appliedZoom = Number(videoTrack.getSettings().zoom);
+        if (Number.isFinite(appliedZoom) && appliedZoom < (zoom?.max ?? appliedZoom)) {
+          usedOpticalZoom = false;
+        }
+      }
     } catch (error) {
       console.warn('CameraPreview: não foi possível aplicar ajustes avançados ao vídeo.', error);
+      usedOpticalZoom = false;
+    }
+
+    if (!usedOpticalZoom) {
+      this.#applyPresentationZoom(this.digitalZoomFallback);
+    } else {
+      this.#applyPresentationZoom(1.2);
+    }
+  }
+
+  #applyPresentationZoom(multiplier = this.presentationZoom) {
+    const scale = Number.isFinite(multiplier) ? Math.max(1, multiplier) : 1;
+    this.presentationZoom = scale;
+    if (!this.videoEl) {
+      return;
+    }
+    this.videoEl.style.transform = `${this.baseTransform} scale(${scale})`;
+    if (scale > 1.01) {
+      this.videoEl.style.objectPosition = '50% 35%';
+    } else {
+      this.videoEl.style.objectPosition = 'center';
     }
   }
 
