@@ -416,6 +416,9 @@ class TerraVisionCore {
       console.warn('Calibração interrompida.', error);
       this.ui.updateStatus('Calibração interrompida. Tente novamente.');
     } finally {
+      if (this.gazeTracker && calibrationThreshold !== previousThreshold) {
+        this.gazeTracker.setConfidenceThreshold(previousThreshold);
+      }
       this.controlManager?.setPaused(false);
       this.isCalibrating = false;
     }
@@ -479,7 +482,3 @@ document.addEventListener('DOMContentLoaded', async () => {
   const app = new TerraVisionCore();
   await app.init();
 });
-
-      if (this.gazeTracker && calibrationThreshold !== previousThreshold) {
-        this.gazeTracker.setConfidenceThreshold(previousThreshold);
-      }
