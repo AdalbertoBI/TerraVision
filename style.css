@@ -237,6 +237,7 @@ body {
   inset: 10% 8%;
   border: 2px dashed rgba(79, 195, 247, 0.35);
   border-radius: 1rem;
+  pointer-events: none;
 }
 
 .calibration-instruction {
