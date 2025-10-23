@@ -9,6 +9,7 @@ export class GazeTracker {
     this.blinkDetector = null;
     this.webgazerConfigured = false;
     this.minConfidence = APP_CONFIG.minConfidence;
+    this.videoElement = null;
   }
 
   setConfidenceThreshold(threshold) {
@@ -22,6 +23,12 @@ export class GazeTracker {
 
     if (this.webgazerConfigured) {
       return;
+    }
+
+    if (this.videoElement && window.webgazer.setVideoElement) {
+      window.webgazer.setVideoElement(this.videoElement);
+    } else if (this.videoElement && window.webgazer.params) {
+      window.webgazer.params.videoElement = this.videoElement;
     }
 
     window.webgazer.setRegression('ridge');
@@ -57,6 +64,15 @@ export class GazeTracker {
     } catch (error) {
       console.error(error);
       throw new Error('Falha ao iniciar WebGazer. Permissões de câmera são necessárias.');
+    }
+  }
+
+  setVideoElement(element) {
+    this.videoElement = element ?? null;
+    if (element && window.webgazer?.setVideoElement) {
+      window.webgazer.setVideoElement(element);
+    } else if (element && window.webgazer?.params) {
+      window.webgazer.params.videoElement = element;
     }
   }
 

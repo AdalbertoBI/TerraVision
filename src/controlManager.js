@@ -1,7 +1,8 @@
 export class ControlManager {
-  constructor(buttons, { dwellDuration, onActivate }) {
+  constructor(buttons, { dwellDuration, onActivate, onFocusChange } = {}) {
     this.dwellDuration = dwellDuration;
     this.onActivate = onActivate;
+    this.onFocusChange = onFocusChange;
     this.paused = false;
     this.focusedButton = null;
     this.focusStart = null;
@@ -118,6 +119,7 @@ export class ControlManager {
     this.focusedButton = null;
     this.focusStart = null;
     this.awaitingBlink = false;
+    this.emitFocusChange('idle');
   }
 
   setFocus(target) {
@@ -131,6 +133,7 @@ export class ControlManager {
     this.focusStart = performance.now();
     this.awaitingBlink = false;
     this.updateProgress(this.focusedButton, 0);
+    this.emitFocusChange('focus', target);
   }
 
   enterAwaitingBlink() {
@@ -139,6 +142,7 @@ export class ControlManager {
     }
     this.awaitingBlink = true;
     this.focusedButton.el.classList.add('is-awaiting');
+    this.emitFocusChange('awaiting', this.focusedButton);
   }
 
   activate(target, source) {
@@ -148,6 +152,8 @@ export class ControlManager {
     this.focusedButton = null;
     this.focusStart = null;
     this.awaitingBlink = false;
+    this.emitFocusChange('activated', target);
+    this.emitFocusChange('idle');
   }
 
   updateProgress(target, value) {
@@ -162,5 +168,15 @@ export class ControlManager {
       return false;
     }
     return point.x >= rect.left && point.x <= rect.right && point.y >= rect.top && point.y <= rect.bottom;
+  }
+
+  emitFocusChange(state, target) {
+    if (!this.onFocusChange) {
+      return;
+    }
+    this.onFocusChange({
+      state,
+      action: target?.action ?? null
+    });
   }
 }

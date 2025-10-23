@@ -1,4 +1,5 @@
 import { APP_CONFIG } from './config.js';
+import { CalibrationModel } from './calibrationModel.js';
 
 const CALIBRATION_POINTS = [
   { x: 0.15, y: 0.15 },
@@ -19,7 +20,8 @@ export class CalibrationManager {
     this.announce = announcer;
     this.sampleWindow = 1200;
     this.minSamplesPerPoint = 12;
-    this.offset = { x: 0, y: 0 };
+    this.model = new CalibrationModel();
+    this.errorThreshold = 65;
     this.loadFromStorage();
   }
 
@@ -29,30 +31,42 @@ export class CalibrationManager {
       if (!stored) {
         return;
       }
-      const parsed = JSON.parse(stored);
-      if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-        this.offset = parsed;
-      }
+      this.model = CalibrationModel.deserialize(stored, {});
     } catch (error) {
       console.warn('Não foi possível carregar calibração anterior.', error);
     }
   }
 
-  persistOffset() {
+  persistModel() {
     try {
-      localStorage.setItem(APP_CONFIG.calibrationStorageKey, JSON.stringify(this.offset));
+      localStorage.setItem(APP_CONFIG.calibrationStorageKey, this.model.serialize());
     } catch (error) {
       console.warn('Não foi possível persistir calibração.', error);
     }
   }
 
   clear() {
-    this.offset = { x: 0, y: 0 };
+    this.model.reset();
     localStorage.removeItem(APP_CONFIG.calibrationStorageKey);
   }
 
-  getOffset() {
-    return this.offset;
+  isReady() {
+    return this.model.isReady();
+  }
+
+  transform(point) {
+    if (!point) {
+      return null;
+    }
+    if (!this.model.isReady()) {
+      return { ...point };
+    }
+    const predicted = this.model.predict(point);
+    return {
+      ...point,
+      x: predicted.x,
+      y: predicted.y
+    };
   }
 
   async calibrate() {
@@ -60,38 +74,33 @@ export class CalibrationManager {
     this.stageEl.appendChild(overlay);
     this.announce?.('Mire o olhar no alvo indicado e clique para registrar cada ponto.');
 
-    const offsets = [];
+    this.model.reset();
+    let recordedSamples = 0;
 
     for (const [index, point] of CALIBRATION_POINTS.entries()) {
       this.updateInstruction(overlay, `Ponto ${index + 1} de ${CALIBRATION_POINTS.length}. Clique no alvo.`);
       const sample = await this.collectPoint(overlay, point);
-      offsets.push(sample);
+      if (sample) {
+        recordedSamples += 1;
+        this.model.update(sample.raw, sample.target);
+      }
     }
 
     overlay.remove();
 
-    if (!offsets.length) {
+    if (!recordedSamples) {
       throw new Error('Nenhum dado coletado para calibração.');
     }
 
-    const sum = offsets.reduce(
-      (acc, item) => {
-        acc.x += item.x;
-        acc.y += item.y;
-        return acc;
-      },
-      { x: 0, y: 0 }
-    );
-
-    this.offset = {
-      x: sum.x / offsets.length,
-      y: sum.y / offsets.length
-    };
-
-    this.persistOffset();
+    this.persistModel();
 
     this.announce?.('Calibração concluída com sucesso.');
-    return { success: true, warnings: 0 };
+    const error = this.model.errorEstimate();
+    return {
+      success: true,
+      warnings: error > this.errorThreshold ? 1 : 0,
+      averageError: error
+    };
   }
 
   buildOverlay() {
@@ -106,6 +115,8 @@ export class CalibrationManager {
     marker.type = 'button';
     marker.className = 'calibration-target';
     marker.setAttribute('aria-label', 'Clique para registrar calibração');
+    marker.dataset.phase = 'armed';
+    marker.textContent = '●';
 
     overlay.appendChild(instruction);
     overlay.appendChild(marker);
@@ -130,6 +141,8 @@ export class CalibrationManager {
     marker.style.left = `${point.x * 100}%`;
     marker.style.top = `${point.y * 100}%`;
     overlay.dataset.state = 'active';
+    marker.dataset.phase = 'armed';
+    marker.textContent = '●';
 
     return new Promise((resolve) => {
       const handleClick = (event) => {
@@ -138,29 +151,33 @@ export class CalibrationManager {
 
         overlay.dataset.state = 'collecting';
         marker.disabled = true;
+        marker.dataset.phase = 'collecting';
+        marker.textContent = '⌛';
         this.updateInstruction(overlay, 'Mantenha o olhar no alvo. Coletando dados...');
 
-        const samples = [];
+        const rawSamples = [];
         const start = performance.now();
 
         const gather = () => {
           const gaze = this.getGaze?.();
           if (gaze && Number.isFinite(gaze.x) && Number.isFinite(gaze.y)) {
-            samples.push({ x: gaze.x - targetX, y: gaze.y - targetY });
+            rawSamples.push({ x: gaze.x, y: gaze.y });
           }
 
           const elapsed = performance.now() - start;
-          if (samples.length >= this.minSamplesPerPoint || elapsed >= this.sampleWindow) {
+          if (rawSamples.length >= this.minSamplesPerPoint || elapsed >= this.sampleWindow) {
             marker.disabled = false;
 
-            if (!samples.length) {
+            if (!rawSamples.length) {
               overlay.dataset.state = 'active';
+              marker.dataset.phase = 'armed';
+              marker.textContent = '●';
               this.updateInstruction(overlay, 'Não registramos o olhar. Ajuste sua posição e clique novamente.');
               marker.addEventListener('click', handleClick, { once: true });
               return;
             }
 
-            const averaged = samples.reduce(
+            const averagedRaw = rawSamples.reduce(
               (acc, sample) => {
                 acc.x += sample.x;
                 acc.y += sample.y;
@@ -169,12 +186,17 @@ export class CalibrationManager {
               { x: 0, y: 0 }
             );
 
-            averaged.x /= samples.length;
-            averaged.y /= samples.length;
+            averagedRaw.x /= rawSamples.length;
+            averagedRaw.y /= rawSamples.length;
 
             overlay.dataset.state = 'cooldown';
+            marker.dataset.phase = 'confirmed';
+            marker.textContent = '✔';
             this.updateInstruction(overlay, 'Ponto registrado!');
-            resolve(averaged);
+            resolve({
+              raw: averagedRaw,
+              target: { x: targetX, y: targetY }
+            });
             return;
           }
 
@@ -188,3 +210,5 @@ export class CalibrationManager {
     });
   }
 }
+
+export default CalibrationManager;

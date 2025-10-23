@@ -5,6 +5,7 @@ import { PizzaRenderer } from './pizzaRenderer.js';
 import { UIManager } from './ui.js';
 import { CalibrationManager } from './calibration.js';
 import { GazeTracker } from './gazeTracker.js';
+import CameraPreview from './cameraPreview.js';
 
 class TerraVisionCore {
   constructor() {
@@ -15,13 +16,15 @@ class TerraVisionCore {
     this.calibration = null;
     this.controlManager = null;
     this.gazeTracker = null;
+    this.cameraPreview = null;
+    this.cameraStats = null;
 
     this.lastGaze = null;
     this.rawGaze = null;
     this.focusedSlice = null;
     this.isTracking = false;
     this.isCalibrating = false;
-    this.calibrationOffset = { x: 0, y: 0 };
+    this.calibrationSummary = null;
     this.autoStartRegistered = false;
 
     this.handleGaze = this.handleGaze.bind(this);
@@ -46,12 +49,20 @@ class TerraVisionCore {
       announce: (message) => this.ui.updateStatus(message)
     });
 
+    this.cameraPreview = new CameraPreview({
+      onStatusChange: (event) => this.handleCameraStatus(event)
+    });
+    this.ui.attachCameraPreview(this.cameraPreview.getVideoElement());
+
     const buttons = this.ui.getControlButtons();
     if (buttons.length) {
       this.controlManager = new ControlManager(buttons, {
         dwellDuration: APP_CONFIG.dwellDuration,
         onActivate: (action, source) => {
           this.handleControlActivation(action, source);
+        },
+        onFocusChange: ({ state }) => {
+          this.handleControlFocusState(state);
         }
       });
     }
@@ -61,6 +72,11 @@ class TerraVisionCore {
 
     if (!this.warnIfInsecureContext()) {
       this.ui.updateStatus('Olhe para a pizza colorida e use o alvo central para calibrar quando desejar.');
+    }
+
+    await this.ensureCameraPreview();
+    if (this.cameraPreview?.isActive()) {
+      this.gazeTracker.setVideoElement(this.cameraPreview.getVideoElement());
     }
 
     const trackingStarted = await this.startTracking();
@@ -125,6 +141,37 @@ class TerraVisionCore {
     });
   }
 
+  async ensureCameraPreview() {
+    if (!this.cameraPreview) {
+      return false;
+    }
+    if (this.cameraPreview.isActive()) {
+      return true;
+    }
+    try {
+      await this.cameraPreview.start();
+      this.ui.toggleCameraPreview(true);
+      return true;
+    } catch (error) {
+      console.warn('Não foi possível iniciar a pré-visualização da câmera.', error);
+      this.ui.updateStatus('Não conseguimos iniciar a pré-visualização da câmera. Verifique permissões.');
+      return false;
+    }
+  }
+
+  handleCameraStatus(event) {
+    if (!event) {
+      return;
+    }
+    if (event.type === 'stats') {
+      this.cameraStats = event.stats;
+      return;
+    }
+    if (event.type === 'error') {
+      this.ui.updateStatus('Falha ao acessar a câmera. Ajuste permissões e tente novamente.');
+    }
+  }
+
   async loadNotes() {
     try {
       const response = await fetch(APP_CONFIG.notesEndpoint, { cache: 'no-store' });
@@ -176,8 +223,7 @@ class TerraVisionCore {
       await this.gazeTracker.setup();
       this.gazeTracker.startBlinkDetector();
 
-      this.isTracking = true;
-      this.applyCalibrationOffset();
+  this.isTracking = true;
       this.ui.updateStatus('Rastreamento ativo. Foque em uma fatia colorida e pisque para tocar.');
       return true;
     } catch (error) {
@@ -207,11 +253,6 @@ class TerraVisionCore {
     return Boolean(window.webgazer);
   }
 
-  applyCalibrationOffset() {
-    const offset = this.calibration.getOffset();
-    this.calibrationOffset = offset || { x: 0, y: 0 };
-  }
-
   async requestCameraPermission() {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('API getUserMedia indisponível neste navegador.');
@@ -239,22 +280,19 @@ class TerraVisionCore {
     }
 
     this.rawGaze = data;
-    const offset = this.calibrationOffset || { x: 0, y: 0 };
-    const adjusted = {
-      x: data.x - offset.x,
-      y: data.y - offset.y,
-      confidence: data.confidence
-    };
+    const adjusted = this.calibration?.transform(data) ?? data;
 
     this.lastGaze = adjusted;
-    this.ui.updateGazeDot(adjusted);
 
     const interactingWithControl = this.controlManager?.handleGaze(adjusted) ?? false;
     if (!interactingWithControl) {
+      this.ui.setGazeState('tracking');
       this.updateSliceFromScreenPoint(adjusted);
     } else {
       this.updateSlice(null);
     }
+
+    this.ui.updateGazeDot(adjusted);
   }
 
   handleBlink() {
@@ -302,7 +340,7 @@ class TerraVisionCore {
     }
   }
 
-  async handleControlActivation(action) {
+  async handleControlActivation(action, source) {
     switch (action) {
       case 'calibrate':
         if (this.isCalibrating) {
@@ -329,6 +367,26 @@ class TerraVisionCore {
     }
   }
 
+  handleControlFocusState(state) {
+    switch (state) {
+      case 'focus':
+        this.ui.setGazeState('control');
+        break;
+      case 'awaiting':
+        this.ui.setGazeState('confirm');
+        break;
+      case 'activated':
+        this.ui.flashGazeConfirmation();
+        this.ui.setGazeState('tracking');
+        break;
+      case 'idle':
+        this.ui.setGazeState('tracking');
+        break;
+      default:
+        break;
+    }
+  }
+
   async startCalibration() {
     if (this.isCalibrating) {
       return;
@@ -339,8 +397,11 @@ class TerraVisionCore {
     try {
       this.ui.updateStatus('Calibração iniciada. Olhe para o alvo indicado e clique para prosseguir.');
       const outcome = await this.calibration.calibrate();
-      this.applyCalibrationOffset();
-      if (outcome?.warnings) {
+      this.calibrationSummary = outcome;
+      if (Number.isFinite(outcome?.averageError)) {
+        const error = outcome.averageError.toFixed(1);
+        this.ui.updateStatus(`Calibração concluída. Erro médio estimado: ${error}px.`);
+      } else if (outcome?.warnings) {
         this.ui.updateStatus('Calibração concluída. Alguns pontos precisam de atenção.');
       } else {
         this.ui.updateStatus('Calibração concluída. Continue a tocar.');
