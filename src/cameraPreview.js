@@ -8,6 +8,12 @@ const DEFAULT_FILTERS = {
 };
 
 const DEFAULT_DIGITAL_ZOOM = 2.75;
+const FACE_DETECTION_INTERVAL = 360;
+const FACE_TARGET_COVERAGE = 0.38;
+const FACE_COVERAGE_TOLERANCE = 0.08;
+const FACE_LOSS_RESET_MS = 2200;
+const FACE_HINT_COOLDOWN_MS = 4000;
+const FACE_ORIGIN_SMOOTHING = 0.24;
 
 const DEFAULT_CONSTRAINTS = {
   video: {
@@ -47,6 +53,24 @@ export class CameraPreview {
     this.baseTransform = 'scaleX(-1)';
     this.presentationZoom = 1;
     this.digitalZoomFallback = DEFAULT_DIGITAL_ZOOM;
+    this.currentTransformOrigin = { x: 50, y: 50 };
+
+    const hasFaceDetector = typeof window !== 'undefined' && 'FaceDetector' in window;
+    if (hasFaceDetector) {
+      try {
+        this.faceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 1 });
+      } catch (error) {
+        console.warn('CameraPreview: FaceDetector não pôde ser iniciado.', error);
+        this.faceDetector = null;
+      }
+    } else {
+      this.faceDetector = null;
+    }
+    this.faceDetectionTimer = null;
+    this.lastFaceDetection = null;
+    this.faceLostSince = null;
+    this.lastFaceHintTs = 0;
+    this.lastFaceDetectionStatus = null;
     this.#applyPresentationZoom();
   }
 
@@ -78,6 +102,7 @@ export class CameraPreview {
     this.stream = null;
     this.isRunning = false;
     this.#stopStatsLoop();
+    this.#stopFaceDetectionLoop();
     this.onStatusChange({ type: 'state', value: 'stopped' });
   }
 
@@ -156,6 +181,7 @@ export class CameraPreview {
     }
 
     this.#startStatsLoop();
+    this.#startFaceDetectionLoop();
   }
 
   #createVideoElement() {
@@ -252,11 +278,15 @@ export class CameraPreview {
     }
   }
 
-  #applyPresentationZoom(multiplier = this.presentationZoom) {
+  #applyPresentationZoom(multiplier = this.presentationZoom, options = {}) {
+    const { skipOriginUpdate = false } = options;
     const scale = Number.isFinite(multiplier) ? Math.max(1, multiplier) : 1;
     this.presentationZoom = scale;
     if (!this.videoEl) {
       return;
+    }
+    if (!skipOriginUpdate) {
+      this.#updateTransformOrigin();
     }
     this.videoEl.style.transform = `${this.baseTransform} scale(${scale})`;
     if (scale > 1.01) {
@@ -264,6 +294,17 @@ export class CameraPreview {
     } else {
       this.videoEl.style.objectPosition = 'center';
     }
+  }
+
+  #updateTransformOrigin() {
+    if (!this.videoEl) {
+      return;
+    }
+    const clamp = (value) => Math.max(0, Math.min(100, value));
+    const originX = clamp(this.currentTransformOrigin?.x ?? 50);
+    const originY = clamp(this.currentTransformOrigin?.y ?? 50);
+    this.currentTransformOrigin = { x: originX, y: originY };
+    this.videoEl.style.transformOrigin = `${originX}% ${originY}%`;
   }
 
   #buildFilterString(filters) {
@@ -333,6 +374,130 @@ export class CameraPreview {
       this.statsTimer = null;
     }
     this.videoEl.style.opacity = '0';
+  }
+
+  #startFaceDetectionLoop() {
+    if (!this.faceDetector || this.faceDetectionTimer || !this.videoEl) {
+      return;
+    }
+
+    const runDetection = () => {
+      if (!this.faceDetector || !this.isRunning) {
+        this.faceDetectionTimer = null;
+        return;
+      }
+
+      this.faceDetector.detect(this.videoEl)
+        .then((faces) => {
+          if (faces?.length) {
+            this.#handleDetectedFace(faces[0]);
+          } else {
+            this.#handleFaceLost();
+          }
+        })
+        .catch((error) => {
+          console.warn('CameraPreview: detecção de rosto indisponível.', error);
+          this.faceDetector = null;
+          this.#handleFaceLost(true);
+        })
+        .finally(() => {
+          if (this.faceDetector && this.isRunning) {
+            this.faceDetectionTimer = window.setTimeout(runDetection, FACE_DETECTION_INTERVAL);
+          } else {
+            this.faceDetectionTimer = null;
+          }
+        });
+    };
+
+    runDetection();
+  }
+
+  #stopFaceDetectionLoop() {
+    if (this.faceDetectionTimer) {
+      clearTimeout(this.faceDetectionTimer);
+      this.faceDetectionTimer = null;
+    }
+    this.faceLostSince = null;
+  }
+
+  #handleDetectedFace(face) {
+    const box = face?.boundingBox ?? face;
+    if (!box || !this.videoEl?.videoWidth || !this.videoEl?.videoHeight) {
+      return;
+    }
+
+    const videoWidth = this.videoEl.videoWidth;
+    const videoHeight = this.videoEl.videoHeight;
+
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+
+    const mirroredOriginX = 100 - (centerX / videoWidth) * 100;
+    const originY = (centerY / videoHeight) * 100;
+
+    const lerp = (start, target, alpha) => start + (target - start) * alpha;
+    this.currentTransformOrigin.x = lerp(this.currentTransformOrigin.x, mirroredOriginX, FACE_ORIGIN_SMOOTHING);
+    this.currentTransformOrigin.y = lerp(this.currentTransformOrigin.y, originY, FACE_ORIGIN_SMOOTHING);
+
+    const faceCoverage = box.height / videoHeight;
+    const desiredZoom = this.#computeAdaptiveZoom(faceCoverage);
+    this.#applyPresentationZoom(desiredZoom);
+
+    this.lastFaceDetection = performance.now();
+    this.faceLostSince = null;
+
+    if (this.lastFaceDetectionStatus !== 'detected') {
+      this.lastFaceDetectionStatus = 'detected';
+      const now = performance.now();
+      if (now - this.lastFaceHintTs > FACE_HINT_COOLDOWN_MS) {
+        this.onStatusChange({ type: 'hint', value: 'Rosto detectado. Ajustando para focar nos olhos.' });
+        this.lastFaceHintTs = now;
+      }
+    }
+  }
+
+  #handleFaceLost(force = false) {
+    const now = performance.now();
+    if (!force) {
+      if (!this.faceLostSince) {
+        this.faceLostSince = now;
+        return;
+      }
+      if (now - this.faceLostSince < FACE_LOSS_RESET_MS) {
+        return;
+      }
+    }
+
+    this.faceLostSince = now;
+    this.currentTransformOrigin = { x: 50, y: 50 };
+    this.#applyPresentationZoom(Math.max(1.2, Math.min(this.presentationZoom, this.digitalZoomFallback)));
+
+    if (this.lastFaceDetectionStatus !== 'lost') {
+      this.lastFaceDetectionStatus = 'lost';
+      if (now - this.lastFaceHintTs > FACE_HINT_COOLDOWN_MS) {
+        this.onStatusChange({
+          type: 'hint',
+          value: 'Não estamos vendo seu rosto. Ajuste o enquadramento da câmera.'
+        });
+        this.lastFaceHintTs = now;
+      }
+    }
+  }
+
+  #computeAdaptiveZoom(faceCoverage) {
+    let scale = this.presentationZoom;
+
+    if (!Number.isFinite(faceCoverage) || faceCoverage <= 0) {
+      return Math.min(this.digitalZoomFallback, Math.max(scale, 1.2));
+    }
+
+    if (faceCoverage < FACE_TARGET_COVERAGE - FACE_COVERAGE_TOLERANCE) {
+      scale *= 1.12;
+    } else if (faceCoverage > FACE_TARGET_COVERAGE + FACE_COVERAGE_TOLERANCE) {
+      scale *= 0.92;
+    }
+
+    return Math.max(1, Math.min(this.digitalZoomFallback, scale));
   }
 }
 

@@ -168,6 +168,10 @@ class TerraVisionCore {
       this.cameraStats = event.stats;
       return;
     }
+    if (event.type === 'hint' && event.value) {
+      this.ui.updateStatus(event.value);
+      return;
+    }
     if (event.type === 'error') {
       this.ui.updateStatus('Falha ao acessar a câmera. Ajuste permissões e tente novamente.');
     }
