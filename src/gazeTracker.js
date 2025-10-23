@@ -10,10 +10,15 @@ export class GazeTracker {
     this.webgazerConfigured = false;
     this.minConfidence = APP_CONFIG.minConfidence;
     this.videoElement = null;
+    this.videoStream = null;
   }
 
   setConfidenceThreshold(threshold) {
     this.minConfidence = threshold;
+  }
+
+  getConfidenceThreshold() {
+    return this.minConfidence;
   }
 
   async setup() {
@@ -29,6 +34,12 @@ export class GazeTracker {
       window.webgazer.setVideoElement(this.videoElement);
     } else if (this.videoElement && window.webgazer.params) {
       window.webgazer.params.videoElement = this.videoElement;
+    }
+
+    if (this.videoStream && window.webgazer.setVideoStream) {
+      window.webgazer.setVideoStream(this.videoStream);
+    } else if (this.videoStream && window.webgazer.params) {
+      window.webgazer.params.videoStream = this.videoStream;
     }
 
     window.webgazer.setRegression('ridge');
@@ -73,6 +84,15 @@ export class GazeTracker {
       window.webgazer.setVideoElement(element);
     } else if (element && window.webgazer?.params) {
       window.webgazer.params.videoElement = element;
+    }
+  }
+
+  setVideoStream(stream) {
+    this.videoStream = stream ?? null;
+    if (stream && window.webgazer?.setVideoStream) {
+      window.webgazer.setVideoStream(stream);
+    } else if (stream && window.webgazer?.params) {
+      window.webgazer.params.videoStream = stream;
     }
   }
 

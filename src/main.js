@@ -77,6 +77,7 @@ class TerraVisionCore {
     await this.ensureCameraPreview();
     if (this.cameraPreview?.isActive()) {
       this.gazeTracker.setVideoElement(this.cameraPreview.getVideoElement());
+      this.gazeTracker.setVideoStream(this.cameraPreview.getStream());
     }
 
     const trackingStarted = await this.startTracking();
@@ -394,6 +395,11 @@ class TerraVisionCore {
 
     this.isCalibrating = true;
     this.controlManager?.setPaused(true);
+    const previousThreshold = this.gazeTracker?.getConfidenceThreshold?.() ?? APP_CONFIG.minConfidence;
+    const calibrationThreshold = Math.min(previousThreshold, 0.3);
+    if (this.gazeTracker && calibrationThreshold !== previousThreshold) {
+      this.gazeTracker.setConfidenceThreshold(calibrationThreshold);
+    }
     try {
       this.ui.updateStatus('Calibração iniciada. Olhe para o alvo indicado e clique para prosseguir.');
       const outcome = await this.calibration.calibrate();
@@ -473,3 +479,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const app = new TerraVisionCore();
   await app.init();
 });
+
+      if (this.gazeTracker && calibrationThreshold !== previousThreshold) {
+        this.gazeTracker.setConfidenceThreshold(previousThreshold);
+      }
