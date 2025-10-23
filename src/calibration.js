@@ -19,7 +19,7 @@ export class CalibrationManager {
     this.getGaze = getGazeFn;
     this.announce = announcer;
     this.sampleWindow = 1200;
-    this.minSamplesPerPoint = 12;
+  this.minSamplesPerPoint = 6;
     this.model = new CalibrationModel();
     this.errorThreshold = 65;
     this.loadFromStorage();
@@ -221,7 +221,35 @@ export class CalibrationManager {
           }
 
           const elapsed = performance.now() - start;
-          if (rawSamples.length >= this.minSamplesPerPoint || elapsed >= this.sampleWindow) {
+          if (rawSamples.length >= this.minSamplesPerPoint) {
+            marker.disabled = false;
+
+            const averagedRaw = rawSamples.reduce(
+              (acc, sample) => {
+                acc.x += sample.x;
+                acc.y += sample.y;
+                return acc;
+              },
+              { x: 0, y: 0 }
+            );
+
+            averagedRaw.x /= rawSamples.length;
+            averagedRaw.y /= rawSamples.length;
+
+            overlay.dataset.state = 'cooldown';
+            marker.dataset.phase = 'confirmed';
+            marker.textContent = '✔';
+            this.updateInstruction(overlay, 'Ponto registrado!');
+            releasePointer();
+            detachListeners();
+            resolve({
+              raw: averagedRaw,
+              target: { x: targetX, y: targetY }
+            });
+            return;
+          }
+
+          if (elapsed >= this.sampleWindow) {
             marker.disabled = false;
 
             if (!rawSamples.length) {
