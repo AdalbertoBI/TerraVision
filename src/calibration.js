@@ -161,6 +161,8 @@ export class CalibrationManager {
 
       const detachListeners = () => {
         marker.removeEventListener('pointerdown', handlePointerDown);
+        marker.removeEventListener('mousedown', handleMouseDown);
+        marker.removeEventListener('touchstart', handleTouchStart);
         marker.removeEventListener('click', handleClickFallback);
         marker.removeEventListener('keydown', handleKeyDown);
       };
@@ -264,6 +266,14 @@ export class CalibrationManager {
         startCollection(event);
       };
 
+      const handleMouseDown = (event) => {
+        startCollection(event);
+      };
+
+      const handleTouchStart = (event) => {
+        startCollection(event);
+      };
+
       const handleClickFallback = (event) => {
         startCollection(event);
       };
@@ -275,6 +285,8 @@ export class CalibrationManager {
       };
 
       marker.addEventListener('pointerdown', handlePointerDown);
+  marker.addEventListener('mousedown', handleMouseDown, { passive: false });
+  marker.addEventListener('touchstart', handleTouchStart, { passive: false });
       marker.addEventListener('click', handleClickFallback);
       marker.addEventListener('keydown', handleKeyDown);
 
