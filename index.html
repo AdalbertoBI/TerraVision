@@ -52,11 +52,17 @@
         <script>
             (function loadWebGazer() {
                 const statusEl = document.getElementById('status');
-                const sources = [
-                    { src: 'libs/webgazer.js', label: 'biblioteca local' },
+                const host = window.location.hostname;
+                const isLocalEnv = ['localhost', '127.0.0.1', ''].includes(host) || window.location.protocol === 'file:';
+
+                const sources = [];
+                if (isLocalEnv) {
+                    sources.push({ src: 'libs/webgazer.js', label: 'biblioteca local', critical: true });
+                }
+                sources.push(
                     { src: 'https://cdn.jsdelivr.net/npm/webgazer/dist/webgazer.min.js', label: 'jsDelivr' },
                     { src: 'https://unpkg.com/webgazer/dist/webgazer.min.js', label: 'unpkg' }
-                ];
+                );
 
                 function inject(index) {
                     if (index >= sources.length) {
@@ -76,8 +82,8 @@
                     script.onerror = () => {
                         console.warn(`Falha ao carregar WebGazer a partir de ${entry.label}.`);
                         if (entry.label === 'biblioteca local') {
-                            console.warn('Execute script/setup-webgazer.(bat|sh) para baixar a versão livre do WebGazer no diretório libs/.');
-                            statusEl && (statusEl.textContent = 'Instale o WebGazer local executando script/setup-webgazer.(bat|sh) ou baixe https://github.com/brownhci/WebGazer e coloque em libs/webgazer.js.');
+                            console.warn('Execute script/setup-webgazer.(bat|sh) para baixar a versão livre do WebGazer no diretório libs/ quando estiver desenvolvendo offline.');
+                            statusEl && (statusEl.textContent = 'Instale o WebGazer local executando script/setup-webgazer.(bat|sh) ou baixe https://github.com/brownhci/WebGazer e coloque em libs/webgazer.js para uso offline.');
                         }
                         inject(index + 1);
                     };
