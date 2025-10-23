@@ -18,7 +18,7 @@ export class CalibrationManager {
     this.stageEl = stageEl;
     this.getGaze = getGazeFn;
     this.announce = announcer;
-    this.sampleWindow = 1200;
+  this.sampleWindow = 1200;
   this.minSamplesPerPoint = 6;
     this.model = new CalibrationModel();
     this.errorThreshold = 65;
@@ -215,7 +215,16 @@ export class CalibrationManager {
         const start = performance.now();
 
         const gather = () => {
-          const gaze = this.getGaze?.();
+          let gaze = this.getGaze?.();
+          if ((!gaze || !Number.isFinite(gaze.x) || !Number.isFinite(gaze.y)) && window.webgazer?.getCurrentPrediction) {
+            const prediction = window.webgazer.getCurrentPrediction();
+            if (prediction && Number.isFinite(prediction.x) && Number.isFinite(prediction.y)) {
+              gaze = {
+                x: prediction.x,
+                y: prediction.y
+              };
+            }
+          }
           if (gaze && Number.isFinite(gaze.x) && Number.isFinite(gaze.y)) {
             rawSamples.push({ x: gaze.x, y: gaze.y });
           }

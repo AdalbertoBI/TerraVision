@@ -395,8 +395,8 @@ class TerraVisionCore {
 
     this.isCalibrating = true;
     this.controlManager?.setPaused(true);
-    const previousThreshold = this.gazeTracker?.getConfidenceThreshold?.() ?? APP_CONFIG.minConfidence;
-    const calibrationThreshold = Math.min(previousThreshold, 0.3);
+  const previousThreshold = this.gazeTracker?.getConfidenceThreshold?.() ?? APP_CONFIG.minConfidence;
+  const calibrationThreshold = 0;
     if (this.gazeTracker && calibrationThreshold !== previousThreshold) {
       this.gazeTracker.setConfidenceThreshold(calibrationThreshold);
     }

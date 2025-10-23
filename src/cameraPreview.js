@@ -207,13 +207,13 @@ export class CameraPreview {
 
     const { zoom } = capabilities;
     if (zoom && Number.isFinite(zoom.min) && Number.isFinite(zoom.max) && zoom.max > zoom.min) {
-      const desired = zoom.min + (zoom.max - zoom.min) * 0.65;
+      const desired = zoom.max;
       if (Number.isFinite(desired)) {
         if (Number.isFinite(zoom.step) && zoom.step > 0) {
           const steps = Math.round((desired - zoom.min) / zoom.step);
           advancedSettings.zoom = Math.min(zoom.max, zoom.min + steps * zoom.step);
         } else {
-          advancedSettings.zoom = Math.min(zoom.max, Math.max(zoom.min, desired));
+          advancedSettings.zoom = desired;
         }
       }
     }
