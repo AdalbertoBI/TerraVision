@@ -7,7 +7,7 @@ const DEFAULT_FILTERS = {
   invert: 0
 };
 
-const DEFAULT_DIGITAL_ZOOM = 1.75;
+const DEFAULT_DIGITAL_ZOOM = 2.75;
 
 const DEFAULT_CONSTRAINTS = {
   video: {
