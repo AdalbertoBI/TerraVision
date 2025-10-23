@@ -1,0 +1,59 @@
+# Terra Vision - Git Ignore
+
+# WebGazer (arquivo grande, download durante setup)
+libs/webgazer.js
+
+# Dependências
+node_modules/
+package-lock.json
+yarn.lock
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cachês
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+
+# Testes
+coverage/
+.nyc_output/
+
+# Sistema
+.AppleDouble
+.LSOverride
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+
+# IDE
+.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Áudio gerado
+sounds/*.wav
+sounds/*.mp3
+!sounds/README.md
+
+# Desenvolvimento
+debug.log
+temp/

@@ -1,0 +1,585 @@
+/**
+ * Estilos para Câmera Avançada e Fullscreen - Terra Vision
+ * Controles de zoom, brilho e modo tela cheia
+ */
+
+/* Painel de Controles de Câmera */
+.camera-controls-panel {
+  background: var(--bg-secondary);
+  border: 1px solid rgba(0, 168, 255, 0.1);
+  border-radius: var(--border-radius);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  animation: slideDown 0.3s ease;
+}
+
+.controls-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(0, 168, 255, 0.1);
+}
+
+.controls-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.controls-section h4 {
+  color: var(--primary-color);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.control-value {
+  min-width: 60px;
+  text-align: center;
+  color: var(--primary-color);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(0, 168, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* Input Range (Slider) */
+.control-group .form-range {
+  flex: 1;
+  min-width: 150px;
+}
+
+.form-range {
+  height: 6px;
+  background: rgba(0, 168, 255, 0.1);
+  border-radius: 3px;
+}
+
+.form-range::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--primary-color);
+  border: 2px solid var(--text-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 168, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.form-range::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(0, 168, 255, 0.5);
+}
+
+.form-range::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--primary-color);
+  border: 2px solid var(--text-primary);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 168, 255, 0.3);
+  transition: all 0.2s ease;
+}
+
+.form-range::-moz-range-thumb:hover {
+  transform: scale(1.2);
+  box-shadow: 0 4px 8px rgba(0, 168, 255, 0.5);
+}
+
+/* Botões de Controle */
+.btn-sm {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  min-width: 38px;
+  transition: var(--transition);
+}
+
+.btn-outline-secondary {
+  border-color: rgba(0, 168, 255, 0.3);
+  color: var(--text-secondary);
+}
+
+.btn-outline-secondary:hover {
+  background: rgba(0, 168, 255, 0.1);
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+}
+
+/* Select da Resolução */
+.control-group .form-select {
+  flex: 1;
+  min-width: 180px;
+  background-color: var(--bg-primary);
+  border: 1px solid rgba(0, 168, 255, 0.2);
+  color: var(--text-primary);
+  padding: 0.5rem;
+  border-radius: 4px;
+}
+
+.control-group .form-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 0.2rem rgba(0, 168, 255, 0.25);
+}
+
+/* Info da Câmera */
+.camera-info {
+  background: rgba(0, 168, 255, 0.05);
+  border: 1px solid rgba(0, 168, 255, 0.1);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.camera-info p {
+  margin: 0.25rem 0;
+  color: var(--text-secondary);
+}
+
+.camera-info p strong {
+  color: var(--primary-color);
+}
+
+/* Botão Fullscreen */
+.btn-fullscreen {
+  background: var(--accent-color);
+  color: #000;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  font-size: 1rem;
+}
+
+.btn-fullscreen:hover {
+  background: #ffc520;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(255, 211, 61, 0.3);
+}
+
+.btn-fullscreen.active {
+  background: var(--success-color);
+  color: #fff;
+}
+
+/* Modo Fullscreen da Pizza */
+.pizza-fullscreen-active {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  z-index: 9999 !important;
+  background: var(--bg-primary) !important;
+}
+
+.pizza-fullscreen-active canvas {
+  position: absolute !important;
+  width: 90vw !important;
+  height: 90vh !important;
+  max-width: 90vmin !important;
+  max-height: 90vmin !important;
+}
+
+/* Overlay de Fullscreen */
+.fullscreen-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.fullscreen-overlay:not(.hidden) {
+  display: flex;
+  opacity: 1;
+}
+
+.fullscreen-overlay.hidden {
+  display: none;
+  pointer-events: none;
+}
+
+.fullscreen-controls {
+  background: var(--bg-secondary);
+  border-radius: var(--border-radius);
+  padding: 2rem;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  animation: scaleIn 0.3s ease;
+}
+
+.fullscreen-controls button {
+  background: var(--danger-color);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-bottom: 1rem;
+}
+
+.fullscreen-controls button:hover {
+  background: #c0392b;
+  transform: scale(1.05);
+}
+
+.fullscreen-hint {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-top: 1rem;
+}
+
+.fullscreen-hint kbd {
+  background: rgba(0, 168, 255, 0.1);
+  border: 1px solid rgba(0, 168, 255, 0.3);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-family: monospace;
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+/* Indicador de Status Fullscreen */
+.fullscreen-indicator {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  background: var(--accent-color);
+  color: #000;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  z-index: 9998;
+  animation: slideIn 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fullscreen-indicator::before {
+  content: '📺';
+  font-size: 1.2rem;
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+  .camera-controls-panel {
+    padding: 1rem;
+  }
+
+  .controls-section {
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .control-group {
+    gap: 0.5rem;
+  }
+
+  .control-group .form-range {
+    min-width: 100px;
+  }
+
+  .control-group .form-select {
+    min-width: 120px;
+  }
+
+  .btn-sm {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.8rem;
+    min-width: 32px;
+  }
+
+  .camera-info {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .camera-controls-panel {
+    padding: 0.75rem;
+  }
+
+  .controls-section {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .controls-section h4 {
+    font-size: 0.85rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .control-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .control-group input,
+  .control-group select,
+  .control-group button {
+    width: 100%;
+  }
+
+  .control-value {
+    width: 100%;
+    margin: 0;
+  }
+
+  .btn-fullscreen {
+    width: 100%;
+    padding: 0.65rem 1rem;
+  }
+
+  .fullscreen-controls {
+    padding: 1.5rem;
+  }
+
+  .fullscreen-indicator {
+    top: 0.5rem;
+    right: 0.5rem;
+    font-size: 0.85rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+/* Modo Escuro */
+[data-theme="dark"] .camera-controls-panel {
+  background: linear-gradient(135deg, rgba(10, 14, 39, 0.8), rgba(21, 26, 58, 0.8));
+}
+
+[data-theme="dark"] .form-range {
+  background: rgba(0, 168, 255, 0.15);
+}
+
+/* Modo Alto Contraste */
+[data-theme="highcontrast"] .camera-controls-panel {
+  border: 2px solid var(--text-primary);
+}
+
+[data-theme="highcontrast"] .controls-section {
+  border-bottom: 2px solid var(--text-primary);
+}
+
+[data-theme="highcontrast"] .btn-outline-secondary {
+  border: 2px solid var(--primary-color);
+}
+
+[data-theme="highcontrast"] .form-range {
+  border: 2px solid var(--primary-color);
+}
+
+/* Animações */
+@keyframes slideDown {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Controles laterais para gaze no fullscreen */
+.fullscreen-gaze-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 3vw;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  z-index: 12000;
+}
+
+.fullscreen-gaze-overlay:not(.hidden) {
+  opacity: 1;
+}
+
+.fullscreen-gaze-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  pointer-events: auto;
+}
+
+.fullscreen-gaze-rail.left {
+  align-items: flex-start;
+}
+
+.fullscreen-gaze-rail.right {
+  align-items: flex-end;
+}
+
+.gaze-control {
+  width: 210px;
+  max-width: 45vw;
+  background: rgba(10, 14, 39, 0.78);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  color: #fff;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  pointer-events: auto;
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.gaze-control .gaze-icon {
+  font-size: 1.6rem;
+}
+
+.gaze-control .gaze-label {
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.gaze-control .gaze-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.gaze-control .gaze-progress {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+.gaze-control .gaze-progress-fill {
+  display: block;
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-color), var(--primary-color));
+  transition: width 0.2s ease;
+}
+
+.gaze-control.focus {
+  transform: scale(1.05);
+  border-color: var(--accent-color);
+  box-shadow: 0 0 25px rgba(255, 217, 61, 0.35);
+}
+
+.gaze-control.awaiting-blink {
+  border-color: var(--success-color);
+  box-shadow: 0 0 28px rgba(46, 204, 113, 0.45);
+}
+
+.gaze-control.active {
+  border-color: var(--accent-color);
+  background: rgba(255, 217, 61, 0.18);
+  color: #fffceb;
+}
+
+.fullscreen-gaze-status {
+  position: absolute;
+  left: 50%;
+  bottom: 4vh;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.75rem;
+  background: rgba(10, 14, 39, 0.82);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 999px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: #fff;
+  pointer-events: none;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.35);
+}
+
+@media (max-width: 768px) {
+  .fullscreen-gaze-overlay {
+    padding: 0 2vw;
+  }
+
+  .gaze-control {
+    width: 44vw;
+    font-size: 0.95rem;
+    padding: 0.85rem 1rem;
+  }
+
+  .gaze-control .gaze-icon {
+    font-size: 1.4rem;
+  }
+
+  .fullscreen-gaze-status {
+    font-size: 0.85rem;
+    padding: 0.6rem 1.5rem;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Acessibilidade */
+@media (prefers-reduced-motion: reduce) {
+  .camera-controls-panel,
+  .btn-fullscreen,
+  .fullscreen-controls,
+  .fullscreen-indicator {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Modo Print */
+@media print {
+  .camera-controls-panel,
+  .btn-fullscreen,
+  .fullscreen-overlay {
+    display: none !important;
+  }
+}

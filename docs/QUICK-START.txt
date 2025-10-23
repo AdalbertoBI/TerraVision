@@ -1,0 +1,188 @@
+🚀 TERRA VISION v2.0 - QUICK START
+================================================================================
+
+ABRIR APLICAÇÃO
+===============
+1. Abra o arquivo: index-new.html
+2. No navegador: Chrome, Firefox, Safari, Edge
+3. Pronto! Você verá a interface.
+
+PERMITIR CÂMERA
+===============
+1. O navegador pede permissão
+2. Clique "Permitir" ou "Allow"
+3. A câmera começa a funcionar
+
+CALIBRAR
+========
+1. Você verá uma grade de 9 pontos
+2. Olhe para cada ponto enquanto pisca
+3. O sistema mede a precisão
+4. Após calibração: pronto para usar!
+
+USAR CÂMERA AVANÇADA
+====================
+Você verá um painel com 5 seções:
+
+🔍 ZOOM (1-10x)
+   - Slider: de 1x até 10x
+   - Botões: + para aumentar, - para reduzir
+   - Reset: volta a 1x
+
+☀️ BRILHO (0-200%)
+   - Slider: de 0% até 200%
+   - Botões: + aumenta 10%, - reduz 10%
+   - Reset: volta a 100%
+
+◉ CONTRASTE (0-200%)
+   - Slider: de 0% até 200%
+   - Botões: + aumenta 10%, - reduz 10%
+   - Reset: volta a 100%
+
+📐 RESOLUÇÃO (4 opções)
+   - Escolha qualidade desejada
+   - VGA: rápido, mobile
+   - 2K: qualidade máxima
+
+⚙️ AÇÕES
+   - Screenshot: baixa PNG
+   - Reset All: volta tudo ao padrão
+
+USAR FULLSCREEN
+===============
+Desktop: Pressione F (ou clique botão)
+Mobile: Duplo toque na pizza
+
+Para sair:
+   - Pressione ESC
+   - Clique fora da pizza
+   - Clique botão X
+
+INICIAR SESSÃO
+==============
+1. Escolha modo (Relaxamento, Treinamento, etc)
+2. Comece a rastrear
+3. Pizza responde ao movimento dos olhos
+4. Feedback visual e sonoro
+
+DICAS ÚTEIS
+===========
+✓ Zoom 3-4x = melhor rastreamento
+✓ Brilho 100-150% = ambientes escuros
+✓ Contraste 110-120% = olhos definidos
+✓ Screenshot = documentar posição
+✓ F = toggle fullscreen
+✓ ESC = sair fullscreen
+
+PROBLEMAS COMUNS
+================
+Câmera não carrega?
+  → Permitir acesso (navegador)
+  → Verificar se câmera está livre
+  → Recarregar página (F5)
+
+Fullscreen não funciona?
+  → Pressionar F (atalho)
+  → Tentar em navegador diferente
+  → Verificar se navegador é moderno
+
+Controles não respondem?
+  → Abrir Console (F12)
+  → Procurar erros em vermelho
+  → Recarregar página (Ctrl+Shift+Delete)
+
+DOCUMENTAÇÃO
+============
+Guias completos em: docs/
+
+Para USUÁRIOS:
+  • CONTROLES-CAMERA.md
+  • FULLSCREEN-GUIDE.md
+  • README-THERAPEUTICO.md
+
+Para DESENVOLVEDORES:
+  • INTEGRACAO-CAMERA-FULLSCREEN.md
+  • MAPA-VISUAL.md
+
+ATALHOS DE TECLADO
+==================
+F               → Toggle fullscreen
+ESC             → Sair fullscreen
+Ctrl + Scroll   → Zoom camera
+Ctrl+Shift+Del  → Limpar cache
+
+RECURSOS
+========
+Resoluções suportadas:
+  • VGA (640×480)
+  • XGA (1024×768)
+  • 1280×960
+  • 2K (1920×1440)
+
+Navegadores:
+  ✅ Chrome 90+
+  ✅ Firefox 88+
+  ✅ Safari 14+
+  ✅ Edge 90+
+  ✅ Opera 76+
+
+Dispositivos:
+  ✅ Desktop
+  ✅ Laptop
+  ✅ Tablet
+  ✅ Smartphone
+
+CONFIGURAÇÕES SALVAS
+====================
+Suas ajustes são salvos automaticamente:
+  • Zoom
+  • Brilho
+  • Contraste
+  • Resolução
+  • Temas
+
+Ao reabrir a página, tudo volta igual!
+
+PRIVACIDADE
+===========
+✅ Câmera processada LOCALMENTE
+✅ Dados NÃO enviados para servidores
+✅ Screenshots salvos NO SEU COMPUTADOR
+✅ Rastreamento APENAS no seu dispositivo
+✅ 100% seguro e privado
+
+PERFORMANCE
+===========
+Esperado:
+  • Desktop: 60 FPS
+  • Tablet: 30-60 FPS
+  • Mobile: 30 FPS
+
+Se ficar lento:
+  1. Reduzir zoom
+  2. Reduzir resolução
+  3. Fechar outras abas
+  4. Fechar outros apps
+
+PRÓXIMAS CARACTERÍSTICAS (v2.1)
+==============================
+□ Presets de configuração
+□ Histórico de sessões
+□ Análise de qualidade
+□ Recomendações inteligentes
+
+PRECISA DE AJUDA?
+=================
+1. Leia a documentação (docs/)
+2. Abra Console (F12) e procure erros
+3. Tente em navegador diferente
+4. Limpe cache do navegador
+
+CONTATO
+=======
+Dúvidas? Sugestões? Bugs?
+Consulte: README.md ou docs/
+
+================================================================================
+Pronto para começar? Abra index-new.html agora! 🚀
+================================================================================
