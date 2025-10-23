@@ -143,11 +143,65 @@ export class CalibrationManager {
     overlay.dataset.state = 'active';
     marker.dataset.phase = 'armed';
     marker.textContent = '●';
+    marker.disabled = false;
+    if (!marker.hasAttribute('tabindex')) {
+      marker.setAttribute('tabindex', '0');
+    }
 
     return new Promise((resolve) => {
-      const handleClick = (event) => {
-        event.preventDefault();
-        marker.removeEventListener('click', handleClick);
+      let collecting = false;
+      let activePointerId = null;
+
+      const releasePointer = () => {
+        if (activePointerId !== null && marker.releasePointerCapture && marker.hasPointerCapture?.(activePointerId)) {
+          marker.releasePointerCapture(activePointerId);
+        }
+        activePointerId = null;
+      };
+
+      const detachListeners = () => {
+        marker.removeEventListener('pointerdown', handlePointerDown);
+        marker.removeEventListener('click', handleClickFallback);
+        marker.removeEventListener('keydown', handleKeyDown);
+      };
+
+      const rearmTarget = () => {
+        collecting = false;
+        marker.disabled = false;
+        overlay.dataset.state = 'active';
+        marker.dataset.phase = 'armed';
+        marker.textContent = '●';
+        requestAnimationFrame(() => {
+          try {
+            marker.focus({ preventScroll: true });
+          } catch (error) {
+            marker.focus?.();
+          }
+        });
+      };
+
+      const startCollection = (event) => {
+        if (collecting) {
+          event?.preventDefault();
+          return;
+        }
+
+        collecting = true;
+        event?.preventDefault();
+        event?.stopPropagation();
+
+        if (event?.type === 'pointerdown') {
+          activePointerId = event.pointerId ?? null;
+          if (activePointerId !== null && marker.setPointerCapture) {
+            try {
+              marker.setPointerCapture(activePointerId);
+            } catch (error) {
+              activePointerId = null;
+            }
+          }
+        } else {
+          activePointerId = null;
+        }
 
         overlay.dataset.state = 'collecting';
         marker.disabled = true;
@@ -169,11 +223,9 @@ export class CalibrationManager {
             marker.disabled = false;
 
             if (!rawSamples.length) {
-              overlay.dataset.state = 'active';
-              marker.dataset.phase = 'armed';
-              marker.textContent = '●';
+              releasePointer();
               this.updateInstruction(overlay, 'Não registramos o olhar. Ajuste sua posição e clique novamente.');
-              marker.addEventListener('click', handleClick, { once: true });
+              rearmTarget();
               return;
             }
 
@@ -193,6 +245,8 @@ export class CalibrationManager {
             marker.dataset.phase = 'confirmed';
             marker.textContent = '✔';
             this.updateInstruction(overlay, 'Ponto registrado!');
+            releasePointer();
+            detachListeners();
             resolve({
               raw: averagedRaw,
               target: { x: targetX, y: targetY }
@@ -206,7 +260,29 @@ export class CalibrationManager {
         requestAnimationFrame(gather);
       };
 
-      marker.addEventListener('click', handleClick, { once: true });
+      const handlePointerDown = (event) => {
+        startCollection(event);
+      };
+
+      const handleClickFallback = (event) => {
+        startCollection(event);
+      };
+
+      const handleKeyDown = (event) => {
+        if (event.key === ' ' || event.key === 'Enter') {
+          startCollection(event);
+        }
+      };
+
+      marker.addEventListener('pointerdown', handlePointerDown);
+      marker.addEventListener('click', handleClickFallback);
+      marker.addEventListener('keydown', handleKeyDown);
+
+      try {
+        marker.focus({ preventScroll: true });
+      } catch (error) {
+        marker.focus?.();
+      }
     });
   }
 }

@@ -51,6 +51,7 @@ export class CameraPreview {
     try {
       this.onStatusChange({ type: 'state', value: 'requesting-permission' });
       const stream = await navigator.mediaDevices.getUserMedia(this.constraints);
+      await this.#optimizeTrackSettings(stream);
       await this.#attachStream(stream);
       this.isRunning = true;
       this.onStatusChange({ type: 'state', value: 'running' });
@@ -177,6 +178,42 @@ export class CameraPreview {
       transition: opacity 0.4s ease;
     `;
     return video;
+  }
+
+  async #optimizeTrackSettings(stream) {
+    const [videoTrack] = stream?.getVideoTracks?.() ?? [];
+    if (!videoTrack?.getCapabilities || !videoTrack?.applyConstraints) {
+      return;
+    }
+
+    const capabilities = videoTrack.getCapabilities();
+    const advancedSettings = {};
+
+    if (Array.isArray(capabilities.focusMode)) {
+      if (capabilities.focusMode.includes('continuous')) {
+        advancedSettings.focusMode = 'continuous';
+      } else if (capabilities.focusMode.includes('auto')) {
+        advancedSettings.focusMode = 'auto';
+      }
+    }
+
+    if (Array.isArray(capabilities.exposureMode) && capabilities.exposureMode.includes('continuous')) {
+      advancedSettings.exposureMode = 'continuous';
+    }
+
+    if (Array.isArray(capabilities.whiteBalanceMode) && capabilities.whiteBalanceMode.includes('continuous')) {
+      advancedSettings.whiteBalanceMode = 'continuous';
+    }
+
+    if (!Object.keys(advancedSettings).length) {
+      return;
+    }
+
+    try {
+      await videoTrack.applyConstraints({ advanced: [advancedSettings] });
+    } catch (error) {
+      console.warn('CameraPreview: não foi possível aplicar ajustes avançados ao vídeo.', error);
+    }
   }
 
   #buildFilterString(filters) {
