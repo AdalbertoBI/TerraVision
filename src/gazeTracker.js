@@ -71,7 +71,8 @@ export class GazeTracker {
       };
 
       if (gaze.confidence < this.minConfidence) {
-        this.onGaze?.(null);
+        const refinedLow = this.refineWithFaceMesh({ ...gaze });
+        this.onGaze?.({ ...refinedLow, lowConfidence: true });
         return;
       }
 

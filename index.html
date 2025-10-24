@@ -15,6 +15,11 @@
     <script id="webgazer-preload" src="libs/webgazer.js" defer></script>
     </head>
     <body>
+        <div
+            id="gaze-cursor"
+            style="position: fixed; width: 20px; height: 20px; background: rgba(255,0,0,0.7); border-radius: 50%; pointer-events: none; z-index: 1000; display: none; left: 0; top: 0; transform: translate(-50%, -50%);"
+            aria-hidden="true"
+        ></div>
         <noscript>
             <div class="noscript" role="alert">
                 Ative o JavaScript para utilizar o Terra Vision com rastreamento ocular.
@@ -38,7 +43,34 @@
             <div id="gaze-dot" aria-hidden="true"></div>
         </main>
 
-        <div id="gazeCursor" aria-hidden="true"></div>
+        <div
+            id="animated-eye-container"
+            style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 500; display: none;"
+            aria-hidden="true"
+        >
+            <svg viewBox="-50 0 350 235" width="200" height="150" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <radialGradient id="eyeball-gradient">
+                        <stop offset="60%" stop-color="#dcdae0" />
+                        <stop offset="100%" stop-color="#a8a7ad" />
+                    </radialGradient>
+                    <radialGradient id="pupil-gradient" cx="0.35" cy="0.35" r="0.65">
+                        <stop offset="0%" stop-color="#444" />
+                        <stop offset="75%" stop-color="#000" />
+                        <stop offset="100%" stop-color="#000" />
+                    </radialGradient>
+                    <filter id="pupil-blur"><feGaussianBlur stdDeviation="0.75" /></filter>
+                </defs>
+                <ellipse cx="131" cy="117.5" rx="100" ry="65" fill="url(#eyeball-gradient)" />
+                <g id="pupil-group">
+                    <ellipse id="pupil" cx="131" cy="117.5" rx="50" ry="50" fill="url(#pupil-gradient)" filter="url(#pupil-blur)" />
+                    <circle id="pupil-reflection" cx="111" cy="102.5" r="5" fill="white" />
+                    <circle id="pupil-reflection-small" cx="124" cy="102.5" r="3" fill="white" />
+                </g>
+                <path id="upper-eyelid" d="M128.5 53.5C59.3 55.5 33 99.6667 28.5 121.5H0V0L261.5 0V121.5H227.5C214.7 65.1 156.167 52.6667 128.5 53.5Z" fill="#000" />
+                <path id="lower-eyelid" d="M128.5 181C59.3 179 33 134.833 28.5 113H0V234.5H261.5V113H227.5C214.7 169.4 156.167 181.833 128.5 181Z" fill="#000" />
+            </svg>
+        </div>
 
         <section id="status" class="status-bar" role="status" aria-live="polite" aria-atomic="true">
             <span id="status-text">

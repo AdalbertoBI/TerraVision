@@ -5,6 +5,7 @@ export const APP_CONFIG = {
   blinkThreshold: 0.22,
   blinkMinDuration: 80,
   blinkCooldown: 500,
+  showPredictionDots: true,
   calibrationStorageKey: 'terra-vision-calibration',
   volumeStorageKey: 'terra-vision-volume',
   therapyStorageKey: 'terra-vision-therapy'

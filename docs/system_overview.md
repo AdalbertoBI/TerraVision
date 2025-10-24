@@ -28,7 +28,9 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - **Web Audio API:** geração e mixagem de sons terapêuticos.
 - **Pipeline de câmera resiliente:** captura com `getUserMedia` assíncrono, verificação de metadata e fallback por mouse quando permissões falham.
 - **Refino ocular híbrido:** coordenadas do WebGazer suavizadas com centros de íris do MediaPipe Face Mesh.
-- **Cursor acessível de gaze:** visualização contínua com `#gazeCursor` e heatmap com decaimento visual.
+- **Cursor acessível de gaze:** visualização contínua com `#gaze-cursor` e heatmap com decaimento visual.
+- **Feedback visual do olhar:** cursor vermelho (setGazeListener) e SVG de olho animado com pupila móvel; piscadas disparam animação sincronizada com o detector.
+- **Pré-visualização de baixa confiança:** cursor dourado e pontos de predição do WebGazer aparecem mesmo antes da calibração para orientar o usuário.
 - **Distribuição offline:** `libs/webgazer.js` servido localmente (baixado por `script/setup-webgazer.*`) para preservar privacidade.
 - **Carregamento assíncrono do WebGazer:** Promise única com timeout e fallback automático para CDN oficial quando o arquivo local falha.
 
@@ -172,7 +174,7 @@ oscillator.stop(audioContext.currentTime + 1.5);
   `npm run setup` executa `script/setup-webgazer.*` e baixa `libs/webgazer.js`. Os scripts usam `python -m http.server` para servir a pasta raiz (porta 8000 por padrão).
 
 1. **Acesso pelo navegador** — Abra `http://localhost:8000` no Chrome ou Edge e autorize o uso da webcam quando solicitado; o preview aparece ao centro e o cursor de gaze surge após a calibração.
-2. **Calibração com a pizza colorida** — Aguarde ~2 segundos para que o WebGazer carregue (carregamento automático de libs), clique em **Calibrar**, fixe o olhar em cada fatia até receber confirmação visual e recorra ao fallback por mouse caso a câmera não esteja disponível.
+2. **Calibração com a pizza colorida** — Aguarde ~2 segundos para o carregamento do WebGazer. Olhe para a tela: o cursor vermelho e a pupila do SVG seguem o gaze enquanto os pontos vermelhos padrão confirmam a predição. Clique em **Calibrar**, fixe o olhar em cada fatia até receber confirmação visual e recorra ao fallback por mouse caso a câmera não esteja disponível. Pisque para acionar os sons terapêuticos quando a fatia desejada estiver em foco.
 3. **Interação terapêutica** — Com o rastreamento ativo, mire o olhar nas fatias para pré-ouvir notas, pisque deliberadamente para selecionar uma fatia (o sistema dispara cliques sintéticos) e aproveite o modo tela cheia (`js/fullscreen.js`) para maior imersão.
 
 ## Erros Comuns e Soluções
@@ -221,6 +223,7 @@ oscillator.stop(audioContext.currentTime + 1.5);
 - **Privacidade e compliance:** adicionar termos de consentimento, opção de processamento totalmente local e limpeza automática de streams.
 - **Analytics terapêuticos:** registrar métricas anônimas de sessões para apoiar terapeutas no acompanhamento.
 - **Heatmaps avançados:** disponibilizar export pós-sessão dos mapas de gaze para acompanhamento terapêutico.
+- **Heatmap opcional de fixação:** habilitar sobreposição configurável que acumula pontos de foco para análises clínicas sem afetar a experiência em tempo real.
 
 ## Framework para Novos Comandos
 

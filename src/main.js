@@ -440,6 +440,9 @@ class TerraVisionCore {
 
       this.gazeTracker.setConfidenceThreshold(APP_CONFIG.minConfidence);
       await this.gazeTracker.setup();
+      if (APP_CONFIG.showPredictionDots && window.webgazer?.showPredictionPoints) {
+        window.webgazer.showPredictionPoints(true);
+      }
   await this.gazeTracker.startBlinkDetector();
 
     this.isTracking = true;
@@ -475,7 +478,11 @@ class TerraVisionCore {
 
     const interactingWithControl = this.controlManager?.handleGaze(adjusted) ?? false;
     if (!interactingWithControl) {
-      this.ui.setGazeState('tracking');
+      if (data.lowConfidence) {
+        this.ui.setGazeState('low');
+      } else {
+        this.ui.setGazeState('tracking');
+      }
       this.updateSliceFromScreenPoint(adjusted);
     } else {
       this.updateSlice(null);
@@ -483,13 +490,14 @@ class TerraVisionCore {
 
     const confidence = data.confidence ?? this.rawGaze?.confidence ?? APP_CONFIG.minConfidence;
     this.ui.updateHeatmap(adjusted, confidence);
-    this.ui.updateGazeDot(adjusted);
+    this.ui.updateGazeDot(adjusted, { state: data.lowConfidence ? 'low' : undefined, clampToStage: !data.lowConfidence });
   }
 
   handleBlink() {
     if (!this.isTracking && !this.mouseFallbackEnabled) {
       return;
     }
+    this.ui.triggerBlinkAnimation();
     this.triggerBlinkInteraction();
     if (this.controlManager?.handleBlink()) {
       this.audio.playFrequency(880, 0.12);
