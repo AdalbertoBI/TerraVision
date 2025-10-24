@@ -1,8 +1,5 @@
 # Terra Vision - Git Ignore
 
-# WebGazer (arquivo grande, download durante setup)
-libs/webgazer.js
-
 # Dependências
 node_modules/
 package-lock.json

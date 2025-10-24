@@ -6,6 +6,103 @@ import { UIManager } from './ui.js';
 import { CalibrationManager } from './calibration.js';
 import { GazeTracker } from './gazeTracker.js';
 
+const WEBGAZER_LOCAL_SRC = 'libs/webgazer.js';
+const WEBGAZER_CDN_SRC = 'https://webgazer.cs.brown.edu/webgazer.js';
+
+let webgazerLoadPromise = null;
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.defer = true;
+    script.async = false;
+    script.crossOrigin = 'anonymous';
+    script.dataset.webgazerLoader = 'dynamic';
+
+    const cleanup = () => {
+      script.removeEventListener('load', handleLoad);
+      script.removeEventListener('error', handleError);
+    };
+
+    const handleLoad = () => {
+      cleanup();
+      resolve();
+    };
+
+    const handleError = () => {
+      cleanup();
+      script.remove();
+      reject(new Error(`Falha ao carregar script ${src}`));
+    };
+
+    script.addEventListener('load', handleLoad, { once: true });
+    script.addEventListener('error', handleError, { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+function withTimeout(promise, timeout, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(label ?? 'Tempo limite excedido.'));
+    }, timeout);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+async function loadWebGazer({ timeout = 5000 } = {}) {
+  if (typeof window === 'undefined') {
+    throw new Error('Ambiente sem suporte a window para carregar WebGazer.');
+  }
+  if (window.webgazer) {
+    return window.webgazer;
+  }
+  if (webgazerLoadPromise) {
+    return webgazerLoadPromise;
+  }
+
+  const attemptLoad = async () => {
+    const localScript = document.querySelector(`script[src="${WEBGAZER_LOCAL_SRC}"]`);
+    if (localScript && !localScript.hasAttribute('data-webgazer-preload')) {
+      localScript.setAttribute('data-webgazer-preload', 'true');
+    }
+
+    try {
+      if (!window.webgazer) {
+        await withTimeout(loadScriptOnce(WEBGAZER_LOCAL_SRC), timeout, 'Timeout ao carregar WebGazer local.');
+      }
+    } catch (localError) {
+      console.warn('[WebGazer] Falha ao carregar versão local. Tentando CDN...', localError);
+      await withTimeout(loadScriptOnce(WEBGAZER_CDN_SRC), timeout, 'Timeout ao carregar WebGazer via CDN.');
+    }
+
+    if (!window.webgazer) {
+      throw new Error('WebGazer carregado, porém objeto global indisponível.');
+    }
+
+    return window.webgazer;
+  };
+
+  webgazerLoadPromise = attemptLoad()
+    .catch((error) => {
+      webgazerLoadPromise = null;
+      document.body?.setAttribute('data-webgazer-missing', 'true');
+      throw error;
+    });
+
+  return webgazerLoadPromise;
+}
+
 class TerraVisionCore {
   constructor() {
     this.notes = [];
@@ -78,7 +175,17 @@ class TerraVisionCore {
     }
 
     const cameraReady = await this.initCamera();
-    await this.ensureTrackingPipeline(cameraReady);
+    let webgazerReady = true;
+    try {
+      await loadWebGazer();
+    } catch (error) {
+      webgazerReady = false;
+      console.error('Falha ao carregar WebGazer durante a inicialização.', error);
+      this.ui.updateStatus('Não foi possível carregar o WebGazer. Modo fallback por mouse ativado.');
+      this.enableMouseFallback();
+    }
+
+    await this.ensureTrackingPipeline(cameraReady && webgazerReady);
   }
 
   warnIfInsecureContext() {
@@ -314,8 +421,8 @@ class TerraVisionCore {
     this.ui.updateStatus('Ativando rastreamento ocular. Permita o acesso à câmera quando solicitado.');
 
     try {
-      const hasWebGazer = await this.waitForWebGazer();
-      if (!hasWebGazer) {
+      const webgazerInstance = await loadWebGazer();
+      if (!webgazerInstance) {
         throw new Error('WebGazer não carregou.');
       }
       const cameraReady = await this.initCamera();
@@ -342,27 +449,13 @@ class TerraVisionCore {
       console.error('Falha ao iniciar rastreamento:', error);
       this.isTracking = false;
       if (error?.message?.includes('WebGazer')) {
-        this.ui.updateStatus('Ainda estamos carregando o WebGazer. Aguarde alguns segundos ou recarregue a página.');
+        this.ui.updateStatus('Não foi possível carregar o WebGazer. Utilizando modo fallback por mouse.');
+        this.enableMouseFallback();
       } else {
         this.ui.updateStatus('Não foi possível acessar a câmera. Verifique permissões e tente novamente.');
       }
       return false;
     }
-  }
-
-  async waitForWebGazer(timeout = 6000) {
-    if (window.webgazer) {
-      return true;
-    }
-
-    const start = performance.now();
-    while (performance.now() - start < timeout) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      if (window.webgazer) {
-        return true;
-      }
-    }
-    return Boolean(window.webgazer);
   }
 
   handleGaze(data) {

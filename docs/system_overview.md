@@ -30,6 +30,7 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - **Refino ocular híbrido:** coordenadas do WebGazer suavizadas com centros de íris do MediaPipe Face Mesh.
 - **Cursor acessível de gaze:** visualização contínua com `#gazeCursor` e heatmap com decaimento visual.
 - **Distribuição offline:** `libs/webgazer.js` servido localmente (baixado por `script/setup-webgazer.*`) para preservar privacidade.
+- **Carregamento assíncrono do WebGazer:** Promise única com timeout e fallback automático para CDN oficial quando o arquivo local falha.
 
 ### Fluxo de funcionamento
 
@@ -171,7 +172,7 @@ oscillator.stop(audioContext.currentTime + 1.5);
   `npm run setup` executa `script/setup-webgazer.*` e baixa `libs/webgazer.js`. Os scripts usam `python -m http.server` para servir a pasta raiz (porta 8000 por padrão).
 
 1. **Acesso pelo navegador** — Abra `http://localhost:8000` no Chrome ou Edge e autorize o uso da webcam quando solicitado; o preview aparece ao centro e o cursor de gaze surge após a calibração.
-2. **Calibração com a pizza colorida** — Aguarde a mensagem “Câmera carregada com sucesso”, clique em **Calibrar**, fixe o olhar em cada fatia até receber confirmação visual e recorra ao fallback por mouse caso a câmera não esteja disponível.
+2. **Calibração com a pizza colorida** — Aguarde ~2 segundos para que o WebGazer carregue (carregamento automático de libs), clique em **Calibrar**, fixe o olhar em cada fatia até receber confirmação visual e recorra ao fallback por mouse caso a câmera não esteja disponível.
 3. **Interação terapêutica** — Com o rastreamento ativo, mire o olhar nas fatias para pré-ouvir notas, pisque deliberadamente para selecionar uma fatia (o sistema dispara cliques sintéticos) e aproveite o modo tela cheia (`js/fullscreen.js`) para maior imersão.
 
 ## Erros Comuns e Soluções
@@ -180,6 +181,7 @@ oscillator.stop(audioContext.currentTime + 1.5);
 | --- | --- | --- |
 | Webcam não inicia | Permissão negada ou browser incompatível | Alertas guiados com try/catch; conceda permissão ou utilize o fallback por mouse para testar a interface. |
 | WebGazer ausente | `libs/webgazer.js` não encontrado no servidor local | Rodar `npm run setup` ou executar `script/setup-webgazer.bat`/`.sh` para baixar a dependência. |
+| WebGazer 404/ não carrega | Caminho incorreto ou arquivo ausente | Download local automatizado com fallback CDN e Promise de carregamento com timeout. |
 | Calibração imprecisa | Iluminação irregular ou reflexos | Usar iluminação difusa, evitar óculos espelhados, repetir calibração. |
 | Confiança do gaze baixa | Usuário muito distante da webcam | Ajustar posição, aumentar brilho, recalibrar. |
 | Latência ou cortes de áudio | Contexto suspenso ou excesso de osciladores | Chamar `audioContext.resume()`, limitar notas simultâneas, usar `stopAll()`. |
