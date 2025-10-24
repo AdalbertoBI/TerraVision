@@ -25,9 +25,13 @@ class TerraVisionCore {
     this.isCalibrating = false;
     this.calibrationSummary = null;
     this.autoStartRegistered = false;
+  this.mouseFallbackEnabled = false;
+  this.mouseFallbackCleanup = null;
+  this.webcamReadyHandled = false;
 
     this.handleGaze = this.handleGaze.bind(this);
     this.handleBlink = this.handleBlink.bind(this);
+  this.onWebcamLoaded = this.onWebcamLoaded.bind(this);
   }
 
   async init() {
@@ -74,15 +78,7 @@ class TerraVisionCore {
     }
 
     const cameraReady = await this.initCamera();
-    if (cameraReady && this.webcamEl) {
-      this.gazeTracker.setVideoElement(this.webcamEl);
-      this.gazeTracker.setVideoStream(this.cameraStream);
-    }
-
-    const trackingStarted = await this.startTracking();
-    if (!trackingStarted) {
-      this.registerAutoStartFallback();
-    }
+    await this.ensureTrackingPipeline(cameraReady);
   }
 
   warnIfInsecureContext() {
@@ -165,19 +161,31 @@ class TerraVisionCore {
       return false;
     }
 
+    this.webcamEl.width = 640;
+    this.webcamEl.height = 480;
+    this.webcamEl.setAttribute('playsinline', 'true');
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const constraints = {
         video: {
           facingMode: 'user',
           width: { ideal: 640 },
           height: { ideal: 480 }
         },
         audio: false
-      });
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
 
       this.cameraStream?.getTracks?.().forEach((track) => track.stop());
       this.cameraStream = stream;
       this.webcamEl.srcObject = stream;
+
+      this.webcamReadyHandled = false;
+      this.webcamEl.addEventListener('loadedmetadata', this.onWebcamLoaded, { once: true });
+      if (this.webcamEl.readyState >= this.webcamEl.HAVE_METADATA) {
+        this.onWebcamLoaded();
+      }
 
       const playPromise = this.webcamEl.play?.();
       if (playPromise instanceof Promise) {
@@ -185,6 +193,7 @@ class TerraVisionCore {
       }
 
       this.webcamEl.style.display = 'block';
+      this.mouseFallbackEnabled && this.disableMouseFallback();
       return true;
     } catch (error) {
       console.error('Falha ao iniciar a câmera:', error);
@@ -194,8 +203,75 @@ class TerraVisionCore {
       } catch (alertError) {
         console.warn('Não foi possível exibir alerta de permissão.', alertError);
       }
+      this.enableMouseFallback();
       return false;
     }
+  }
+
+  async ensureTrackingPipeline(cameraReady) {
+    if (cameraReady && this.webcamEl) {
+      this.setupGazeVideoBindings();
+    }
+
+    const trackingStarted = cameraReady ? await this.startTracking() : false;
+    if (!trackingStarted) {
+      this.registerAutoStartFallback();
+    }
+  }
+
+  onWebcamLoaded() {
+    if (this.webcamReadyHandled) {
+      return;
+    }
+    this.webcamReadyHandled = true;
+    this.ui.updateStatus('Câmera carregada com sucesso. Preparando rastreamento.');
+    this.setupGazeVideoBindings();
+    void this.startTracking();
+  }
+
+  setupGazeVideoBindings() {
+    if (!this.webcamEl) {
+      return;
+    }
+    this.gazeTracker.setVideoElement(this.webcamEl);
+    if (this.cameraStream) {
+      this.gazeTracker.setVideoStream(this.cameraStream);
+    }
+  }
+
+  enableMouseFallback() {
+    if (this.mouseFallbackEnabled) {
+      return;
+    }
+    this.mouseFallbackEnabled = true;
+    this.ui.updateStatus('Modo fallback por mouse ativo. Use o cursor para interagir enquanto a câmera não está disponível.');
+
+    const handlePointerMove = (event) => {
+      const synthetic = {
+        x: event.clientX,
+        y: event.clientY,
+        confidence: 1
+      };
+      this.handleGaze(synthetic);
+    };
+
+    document.addEventListener('pointermove', handlePointerMove);
+    this.mouseFallbackCleanup = () => {
+      document.removeEventListener('pointermove', handlePointerMove);
+    };
+
+    if (window.webgazer?.params) {
+      window.webgazer.params.showVideo = false;
+    }
+  }
+
+  disableMouseFallback() {
+    if (!this.mouseFallbackEnabled) {
+      return;
+    }
+    this.mouseFallbackCleanup?.();
+    this.mouseFallbackCleanup = null;
+    this.mouseFallbackEnabled = false;
   }
 
   async loadNotes() {
@@ -318,9 +394,10 @@ class TerraVisionCore {
   }
 
   handleBlink() {
-    if (!this.isTracking) {
+    if (!this.isTracking && !this.mouseFallbackEnabled) {
       return;
     }
+    this.triggerBlinkInteraction();
     if (this.controlManager?.handleBlink()) {
       this.audio.playFrequency(880, 0.12);
       return;
@@ -333,6 +410,24 @@ class TerraVisionCore {
         this.ui.updateStatus(`Nota ${note.label} reproduzida.`);
       }
     }
+  }
+
+  triggerBlinkInteraction() {
+    const gazeSource = this.lastGaze ?? this.rawGaze;
+    if (!gazeSource) {
+      return;
+    }
+    const target = document.elementFromPoint(gazeSource.x, gazeSource.y);
+    if (!target) {
+      return;
+    }
+    const clickEvent = new MouseEvent('click', {
+      bubbles: true,
+      cancelable: true,
+      clientX: gazeSource.x,
+      clientY: gazeSource.y
+    });
+    target.dispatchEvent(clickEvent);
   }
 
   updateSliceFromScreenPoint(point) {
@@ -378,6 +473,10 @@ class TerraVisionCore {
               this.registerAutoStartFallback();
               return;
             }
+          }
+          if (!this.cameraStream && !this.mouseFallbackEnabled) {
+            this.ui.updateStatus('A calibração precisa da câmera ativa. Permita o acesso ou aguarde o fallback por mouse.');
+            return;
           }
           await this.startCalibration();
         } finally {

@@ -4,7 +4,7 @@ export const APP_CONFIG = {
   notesEndpoint: 'notes.json',
   blinkThreshold: 0.22,
   blinkMinDuration: 80,
-  blinkCooldown: 260,
+  blinkCooldown: 500,
   calibrationStorageKey: 'terra-vision-calibration',
   volumeStorageKey: 'terra-vision-volume',
   therapyStorageKey: 'terra-vision-therapy'

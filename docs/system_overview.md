@@ -26,6 +26,10 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - **WebGazer.js:** biblioteca de eye-tracking para browsers.
 - **MediaPipe Face Mesh:** landmarks faciais de alta resolução usados para piscadas e métricas oculares.
 - **Web Audio API:** geração e mixagem de sons terapêuticos.
+- **Pipeline de câmera resiliente:** captura com `getUserMedia` assíncrono, verificação de metadata e fallback por mouse quando permissões falham.
+- **Refino ocular híbrido:** coordenadas do WebGazer suavizadas com centros de íris do MediaPipe Face Mesh.
+- **Cursor acessível de gaze:** visualização contínua com `#gazeCursor` e heatmap com decaimento visual.
+- **Distribuição offline:** `libs/webgazer.js` servido localmente (baixado por `script/setup-webgazer.*`) para preservar privacidade.
 
 ### Fluxo de funcionamento
 
@@ -160,28 +164,22 @@ oscillator.stop(audioContext.currentTime + 1.5);
 
   ```cmd
   npm install
+  npm run setup
   npm run start
   ```
 
-  Os scripts usam `python -m http.server` para servir a pasta raiz (porta 8000 por padrão).
+  `npm run setup` executa `script/setup-webgazer.*` e baixa `libs/webgazer.js`. Os scripts usam `python -m http.server` para servir a pasta raiz (porta 8000 por padrão).
 
-1. **Acesso pelo navegador**
-   - Abra `http://localhost:8000` no Chrome ou Edge.
-   - Autorize o uso da webcam quando solicitado.
-1. **Calibração com a pizza colorida**
-   - Siga o modal de permissões.
-   - Clique em **Calibrar** e fixe o olhar em cada fatia até receber confirmação visual.
-   - Recalibre sempre que o usuário mudar de posição.
-1. **Interação terapêutica**
-   - Com o rastreamento ativo, mire o olhar nas fatias para pré-ouvir notas.
-   - Pisque deliberadamente para selecionar uma fatia e tocar a combinação correspondente.
-   - Utilize o modo tela cheia para maior imersão (`js/fullscreen.js`).
+1. **Acesso pelo navegador** — Abra `http://localhost:8000` no Chrome ou Edge e autorize o uso da webcam quando solicitado; o preview aparece ao centro e o cursor de gaze surge após a calibração.
+2. **Calibração com a pizza colorida** — Aguarde a mensagem “Câmera carregada com sucesso”, clique em **Calibrar**, fixe o olhar em cada fatia até receber confirmação visual e recorra ao fallback por mouse caso a câmera não esteja disponível.
+3. **Interação terapêutica** — Com o rastreamento ativo, mire o olhar nas fatias para pré-ouvir notas, pisque deliberadamente para selecionar uma fatia (o sistema dispara cliques sintéticos) e aproveite o modo tela cheia (`js/fullscreen.js`) para maior imersão.
 
 ## Erros Comuns e Soluções
 
 | Problema | Causa provável | Correção sugerida |
 | --- | --- | --- |
-| Webcam não inicia | Permissão negada ou outro app usando a câmera | Verificar pop-up do navegador, fechar apps que usam câmera, reiniciar `start()`. |
+| Webcam não inicia | Permissão negada ou browser incompatível | Alertas guiados com try/catch; conceda permissão ou utilize o fallback por mouse para testar a interface. |
+| WebGazer ausente | `libs/webgazer.js` não encontrado no servidor local | Rodar `npm run setup` ou executar `script/setup-webgazer.bat`/`.sh` para baixar a dependência. |
 | Calibração imprecisa | Iluminação irregular ou reflexos | Usar iluminação difusa, evitar óculos espelhados, repetir calibração. |
 | Confiança do gaze baixa | Usuário muito distante da webcam | Ajustar posição, aumentar brilho, recalibrar. |
 | Latência ou cortes de áudio | Contexto suspenso ou excesso de osciladores | Chamar `audioContext.resume()`, limitar notas simultâneas, usar `stopAll()`. |
@@ -220,6 +218,7 @@ oscillator.stop(audioContext.currentTime + 1.5);
 - **Calibração inteligente:** incorporar amostragem dinâmica e modelos de ML leves para maior precisão em ambientes variados.
 - **Privacidade e compliance:** adicionar termos de consentimento, opção de processamento totalmente local e limpeza automática de streams.
 - **Analytics terapêuticos:** registrar métricas anônimas de sessões para apoiar terapeutas no acompanhamento.
+- **Heatmaps avançados:** disponibilizar export pós-sessão dos mapas de gaze para acompanhamento terapêutico.
 
 ## Framework para Novos Comandos
 

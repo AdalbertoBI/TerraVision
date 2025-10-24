@@ -14,6 +14,9 @@ export class GazeTracker {
     this.videoStream = null;
   this.faceMesh = null;
   this.faceMeshAvailable = false;
+  this.lastFaceMetrics = null;
+  this.lastFaceMetricsAt = 0;
+  this.refinementAlpha = 0.35;
   }
 
   setConfidenceThreshold(threshold) {
@@ -72,7 +75,8 @@ export class GazeTracker {
         return;
       }
 
-      this.onGaze?.(gaze);
+      const refined = this.refineWithFaceMesh(gaze);
+      this.onGaze?.(refined);
     });
 
     try {
@@ -163,8 +167,49 @@ export class GazeTracker {
     this.faceMesh = new FaceMeshProcessor({
       videoElement: this.videoElement,
       maxFps: 28,
-      onMetrics: null,
+      onMetrics: (metrics) => this.handleFaceMetrics(metrics),
       onError: (error) => console.warn('[FaceMesh] erro', error)
     });
+  }
+
+  handleFaceMetrics(metrics) {
+    if (!metrics) {
+      return;
+    }
+    this.lastFaceMetrics = metrics;
+    this.lastFaceMetricsAt = metrics.timestamp ?? performance.now();
+  }
+
+  refineWithFaceMesh(gaze) {
+    const metrics = this.lastFaceMetrics;
+    if (!metrics?.gaze || !this.videoElement) {
+      return gaze;
+    }
+    const now = performance.now();
+    if (now - this.lastFaceMetricsAt > 140) {
+      return gaze;
+    }
+
+    const rect = this.videoElement.getBoundingClientRect?.();
+    if (!rect || rect.width === 0 || rect.height === 0) {
+      return gaze;
+    }
+
+    const clamp01 = (value) => Math.min(1, Math.max(0, value));
+    const normalizedX = clamp01(metrics.gaze.x ?? 0.5);
+    const normalizedY = clamp01(metrics.gaze.y ?? 0.5);
+
+    const mirroredX = 1 - normalizedX;
+    const faceX = rect.left + mirroredX * rect.width;
+    const faceY = rect.top + normalizedY * rect.height;
+
+    const alpha = clamp01(this.refinementAlpha ?? 0.35);
+
+    return {
+      ...gaze,
+      x: gaze.x * (1 - alpha) + faceX * alpha,
+      y: gaze.y * (1 - alpha) + faceY * alpha,
+      confidence: Math.max(gaze.confidence ?? 0, metrics.ear ? 0.6 : 0.45)
+    };
   }
 }
