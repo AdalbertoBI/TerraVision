@@ -9,6 +9,8 @@
 - Rastreamento do olhar via webcam utilizando WebGazer.js.
 - Calibração gamificada com a "pizza colorida" para mapear zonas de interação.
 - Acionamento de áudio terapêutico por meio da Web Audio API com notas e sequências relaxantes.
+- Detecção de piscadas enriquecida com MediaPipe Face Mesh para ações confiáveis.
+- Feedback visual duplo: cursor de gaze em tempo real e heatmap terapêutico acumulativo.
 
 **Público-alvo:** Pessoas em terapias de relaxamento, indivíduos com deficiências motoras que precisam de interfaces hands-free, terapeutas e pesquisadores em reabilitação sensorial.
 
@@ -22,6 +24,7 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - **CSS3:** define a identidade visual terapêutica (`style.css`, `css/*.css`).
 - **JavaScript ES6:** organiza lógicas de captura de vídeo, rastreamento, áudio e UI (`js/`, `src/`).
 - **WebGazer.js:** biblioteca de eye-tracking para browsers.
+- **MediaPipe Face Mesh:** landmarks faciais de alta resolução usados para piscadas e métricas oculares.
 - **Web Audio API:** geração e mixagem de sons terapêuticos.
 
 ### Fluxo de funcionamento
@@ -37,6 +40,14 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
           |
           v
 [Mapeamento do olhar] -- focos/piscadas --> [Triggers musicais + feedback visual]
+
+### Pipeline combinado de rastreamento (2025)
+
+1. **WebGazer.js (gaze absoluto):** mapeia coordenadas de olhar após calibração com os setores da pizza.
+2. **MediaPipe Face Mesh (biometria ocular):** processa o mesmo stream para obter EAR (Eye Aspect Ratio) e centro das íris.
+3. **Blink Detector adaptativo:** usa o EAR do Face Mesh com thresholds de `APP_CONFIG` para disparar piscadas voluntárias.
+4. **Fallback inteligente:** se o Face Mesh não iniciar, o detector volta ao rastreador CLM padrão do WebGazer.
+5. **Heatmap terapêutico:** pontos de gaze alimentam `HeatmapRenderer`, gerando reforço visual suavizado com decaimento contínuo.
 ```
 
 ## Estrutura do Código Fonte
@@ -84,6 +95,8 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 | `src/audio.js` | Núcleo de áudio reusável para builds modernas. |
 | `src/gazeTracker.js` | Implementação modular do rastreador ocular. |
 | `src/blinkDetector.js` | Detector reaproveitável de piscadas. |
+| `src/heatmap.js` | Renderizador de heatmap baseado em gaze com decaimento e suavização. |
+| `src/faceMeshProcessor.js` | Ponte com MediaPipe Face Mesh (EAR, íris, métricas faciais). |
 | `src/pizzaRenderer.js` | Renderização da pizza em contexto modular. |
 | `src/therapyMode.js` | Lógica de terapia em formato ES module. |
 | `src/calibration.js` | Funções de calibração compartilháveis. |
@@ -174,6 +187,30 @@ oscillator.stop(audioContext.currentTime + 1.5);
 | Latência ou cortes de áudio | Contexto suspenso ou excesso de osciladores | Chamar `audioContext.resume()`, limitar notas simultâneas, usar `stopAll()`. |
 | Travamentos em browsers específicos | Falta de suporte ao WebGazer/WebGL | Priorizar Chrome/Edge, detectar `navigator.userAgent` para ocultar features incompatíveis. |
 | Piscadas não mapeadas | Threshold inadequado em `blinkDetector` | Ajustar sensibilidade e debounce conforme feedback do usuário. |
+
+## Recursos recomendados para rastreamento ocular (2025)
+
+| Recurso | Uso sugerido no TerraVision | Pontos fortes | Limitações | Referência |
+| --- | --- | --- | --- | --- |
+| **WebGazer.js** | Continuidade do gaze absoluto com calibração na pizza. | CDN único, roda offline, integra-se à calibração existente. | Exige 5–10 pontos de calibração e consome CPU em máquinas antigas. | [GitHub · brownhci/WebGazer](https://github.com/brownhci/WebGazer) |
+| **MediaPipe Face Mesh** | Landmarks faciais + EAR para piscadas e métricas de estabilidade. | Alta precisão ocular, modelo leve (~2 MB), roda no browser. | Requer pós-processamento para converter em coordenadas de tela. | [TensorFlow.js Models](https://github.com/tensorflow/tfjs-models/tree/master/face-landmarks-detection) |
+| **EyeGestures Toolkit** | Futuras interações por gestos oculares (sorriso, sobrancelhas). | Projeto focado em acessibilidade, callbacks prontos para áudio. | Documentação em evolução; API ainda instável. | [Repositório EyeGestures (open-source)](https://github.com/topics/eyegestures) |
+| **Handsfree.js** | Prototipagem rápida de interações multimodais com mão + olhar. | Eventos JS prontos (`handsfree.event`), integra com MediaPipe. | Menor precisão para gaze absoluto; ideal para testes. | [handsfree.js.org](https://handsfree.js.org) |
+| **WebGazeTrack (Chrome Ext.)** | Coleta remota de dados de gaze para estudos clínicos. | Setup simples, exporta CSV. | Disponível apenas como extensão Chrome; sem embed direto. | [ACM · WebGazeTrack](https://dl.acm.org/) |
+
+> **Dica:** inicie com WebGazer + Face Mesh (implementados neste repositório). EyeGestures e Handsfree.js podem ser plug-ins opcionais quando for necessário ampliar gestos acessíveis.
+
+## Repositórios analisados (GitHub, 2024-2025)
+
+| Repositório | Link | Recomendações para o TerraVision | Pontos fortes | Considerações |
+| --- | --- | --- | --- | --- |
+| WebGazer.js | [github.com/brownhci/WebGazer](https://github.com/brownhci/WebGazer) | Manter como base para gaze absoluto e cursor; seguir exemplos de auto-calibração progressiva. | Implementação madura, roda totalmente no browser, exemplos pronto-uso. | Calibração inicial manual (5-10 pontos) e uso intenso de CPU em notebooks antigos. |
+| HUE Vision | [github.com/simplysuvi/hue-vision](https://github.com/simplysuvi/hue-vision) | Inspiração para heatmaps e overlay de landmarks; sugere uso de MediaPipe com refinamento de íris. | Visualizações modernas, ML on-device, guia detalhado com TensorFlow.js. | Modelo pesado em conexões lentas, exige otimização ao rodar junto com Web Audio. |
+| EyeGestures | [github.com/NativeSensors/EyeGestures](https://github.com/NativeSensors/EyeGestures) | Explorar gestos avançados (sacadas, fixação) e feedback auditivo para sessões terapêuticas customizadas. | Foco em acessibilidade, inclui eventos de alto nível (blink, dwell, expressões). | Porta JS ainda lite; depende de distância usuário-câmera controlada. |
+| WebGazer + Heatmap | [github.com/Maldox/webgazer](https://github.com/Maldox/webgazer) | Referência para agregação de gaze (heatmaps) e relatórios pós-sessão. | Baseado no WebGazer, licença aberta, código simples de adaptar. | Licença GPLv3 pode limitar uso comercial direto; efeito gráfico mais pesado. |
+| Eye-Tracker Demo | [github.com/SHAILY24/eye-tracker-demo](https://github.com/SHAILY24/eye-tracker-demo) | Amostra de dwell-time nos alvos; útil para validar thresholds terapêuticos. | Interface clara com calibração de 9 pontos, demonstração ao vivo. | Requer backend Flask para features completas; mira desktops. |
+| Gazealytics | [github.com/gazealytics/gazealytics-master](https://github.com/gazealytics/gazealytics-master) | Ferramentas de análise pós-sessão (scanpaths, AOIs) para relatórios clínicos. | Visualizações ricas, export snapshots, brushing interativo. | Necessita stack Python/Conda; foco analítico e não real-time. |
+| GazeRecorder | [github.com/szydej/GazeRecorder](https://github.com/szydej/GazeRecorder) | Captura sessões completas e gera heatmaps para revisão terapêutica. | API JS simples e documentação objetiva. | Depende de serviços externos para armazenamento/replay. |
 
 ## Sugestões de Melhorias
 

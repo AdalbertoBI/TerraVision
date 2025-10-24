@@ -257,7 +257,7 @@ class TerraVisionCore {
 
       this.gazeTracker.setConfidenceThreshold(APP_CONFIG.minConfidence);
       await this.gazeTracker.setup();
-      this.gazeTracker.startBlinkDetector();
+  await this.gazeTracker.startBlinkDetector();
 
     this.isTracking = true;
       this.ui.updateStatus('Rastreamento ativo. Foque em uma fatia colorida e pisque para tocar.');
@@ -312,6 +312,8 @@ class TerraVisionCore {
       this.updateSlice(null);
     }
 
+    const confidence = data.confidence ?? this.rawGaze?.confidence ?? APP_CONFIG.minConfidence;
+    this.ui.updateHeatmap(adjusted, confidence);
     this.ui.updateGazeDot(adjusted);
   }
 

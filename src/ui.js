@@ -1,3 +1,5 @@
+import { HeatmapRenderer } from './heatmap.js';
+
 export class UIManager {
   constructor() {
     this.stageEl = document.querySelector('.stage');
@@ -6,10 +8,12 @@ export class UIManager {
     this.statusMessageEl = document.getElementById('status-text');
     this.gazeDot = document.getElementById('gaze-dot');
     this.gazeCursor = document.getElementById('gazeCursor');
+    this.heatmapCanvas = document.getElementById('heatmap-canvas');
     this.calibrateButton = document.querySelector('[data-action="calibrate"]');
     this.gazeState = 'idle';
     this.gazeFlashTimeout = null;
     this.cameraPreviewEl = null;
+    this.heatmap = this.heatmapCanvas ? new HeatmapRenderer(this.heatmapCanvas, { radius: 85 }) : null;
     if (this.gazeDot) {
       this.gazeDot.dataset.state = this.gazeState;
     }
@@ -98,6 +102,26 @@ export class UIManager {
     }
     this.gazeState = state || 'tracking';
     this.gazeDot.dataset.state = this.gazeState;
+  }
+
+  updateHeatmap(point, confidence = 0.5) {
+    if (!this.heatmap || !this.stageEl || !point) {
+      return;
+    }
+    const rect = this.stageEl.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) {
+      return;
+    }
+    const x = point.x - rect.left;
+    const y = point.y - rect.top;
+    if (Number.isNaN(x) || Number.isNaN(y)) {
+      return;
+    }
+    if (x < -40 || y < -40 || x > rect.width + 40 || y > rect.height + 40) {
+      return;
+    }
+    const normalized = Math.min(Math.max(confidence ?? 0.45, 0.12), 1.35);
+    this.heatmap.addPoint(x, y, normalized);
   }
 
   attachCameraPreview(videoEl) {

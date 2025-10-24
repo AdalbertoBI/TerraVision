@@ -8,6 +8,8 @@ export class BlinkDetector {
     this.closedAt = 0;
     this.lastBlinkAt = 0;
     this.active = false;
+  this.externalMetrics = false;
+  this.unsubscribeExternal = null;
 
     this.leftEyeIndices = [23, 24, 25, 26, 27, 28];
     this.rightEyeIndices = [29, 30, 31, 32, 33, 34];
@@ -23,18 +25,58 @@ export class BlinkDetector {
       return;
     }
     this.active = true;
+    if (this.externalMetrics) {
+      return;
+    }
     requestAnimationFrame(() => this.loop());
   }
 
   stop() {
     this.active = false;
+    if (typeof this.unsubscribeExternal === 'function') {
+      this.unsubscribeExternal();
+      this.unsubscribeExternal = null;
+    }
     if (this.eyeGestures) {
       this.eyeGestures.stop();
     }
   }
 
+  attachExternalSource(subscribeFn) {
+    if (typeof subscribeFn !== 'function') {
+      return;
+    }
+    if (this.unsubscribeExternal) {
+      this.unsubscribeExternal();
+      this.unsubscribeExternal = null;
+    }
+    this.unsubscribeExternal = subscribeFn((metrics) => {
+      if (!this.active) {
+        return;
+      }
+      const ear = metrics?.ear ?? metrics?.avgEar ?? metrics?.averageEar;
+      if (typeof ear !== 'number' || Number.isNaN(ear)) {
+        return;
+      }
+      this.processEarSample(ear, metrics?.timestamp ?? performance.now());
+    });
+    this.externalMetrics = Boolean(this.unsubscribeExternal);
+  }
+
+  detachExternalSource() {
+    if (this.unsubscribeExternal) {
+      this.unsubscribeExternal();
+      this.unsubscribeExternal = null;
+    }
+    this.externalMetrics = false;
+  }
+
   loop() {
     if (!this.active) {
+      return;
+    }
+
+    if (this.externalMetrics) {
       return;
     }
 
@@ -47,23 +89,28 @@ export class BlinkDetector {
       const ear = (earLeft + earRight) / 2;
       const now = performance.now();
 
-      if (ear < this.threshold) {
-        if (!this.isClosed) {
-          this.isClosed = true;
-          this.closedAt = now;
-        }
-      } else if (this.isClosed) {
-        const duration = now - this.closedAt;
-        const sinceLast = now - this.lastBlinkAt;
-        if (duration >= this.minDuration && sinceLast >= this.cooldown) {
-          this.lastBlinkAt = now;
-          this.onBlink?.();
-        }
-        this.isClosed = false;
-      }
+      this.processEarSample(ear, now);
     }
 
     requestAnimationFrame(() => this.loop());
+  }
+
+  processEarSample(ear, timestamp) {
+    const now = typeof timestamp === 'number' ? timestamp : performance.now();
+    if (ear < this.threshold) {
+      if (!this.isClosed) {
+        this.isClosed = true;
+        this.closedAt = now;
+      }
+    } else if (this.isClosed) {
+      const duration = now - this.closedAt;
+      const sinceLast = now - this.lastBlinkAt;
+      if (duration >= this.minDuration && sinceLast >= this.cooldown) {
+        this.lastBlinkAt = now;
+        this.onBlink?.();
+      }
+      this.isClosed = false;
+    }
   }
 
   eyeAspectRatio(indices, points) {
