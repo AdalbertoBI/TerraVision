@@ -1,4 +1,4 @@
-import { APP_CONFIG } from './config.js';
+import { APP_CONFIG, DEFAULT_NOTES } from './config.js';
 import { CalibrationModel } from './calibrationModel.js';
 
 const CALIBRATION_POINTS = [
@@ -24,6 +24,10 @@ export class CalibrationManager {
     this.errorThreshold = 65;
     this.blinkTrigger = null;
     this.activeOverlay = null;
+    this.passiveOverlay = null;
+    this.passiveDots = [];
+    this.passiveCallbacks = null;
+    this.passiveCompleted = false;
     this.loadFromStorage();
   }
 
@@ -359,6 +363,155 @@ export class CalibrationManager {
       return true;
     }
     return false;
+  }
+
+  startPassiveBootstrap({ pointCount = 9, onProgress, onComplete } = {}) {
+    if (!this.stageEl || this.passiveOverlay) {
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'passive-bootstrap-overlay';
+
+    const instruction = document.createElement('p');
+    instruction.className = 'passive-bootstrap-instruction';
+    instruction.textContent = 'Clique nos pontos onde você está olhando para ensinar o sistema.';
+
+    const container = document.createElement('div');
+    container.className = 'passive-bootstrap-dots';
+
+    overlay.appendChild(instruction);
+    overlay.appendChild(container);
+    this.stageEl.appendChild(overlay);
+
+    const points = this.generatePassivePoints(pointCount);
+    const dots = points.map((point, index) => {
+      const dot = document.createElement('span');
+      dot.className = 'passive-bootstrap-dot';
+      dot.style.setProperty('--dot-color', point.color);
+      dot.style.left = `${(point.x * 100).toFixed(2)}%`;
+      dot.style.top = `${(point.y * 100).toFixed(2)}%`;
+      dot.dataset.index = String(index);
+      container.appendChild(dot);
+      return {
+        element: dot,
+        x: point.x,
+        y: point.y,
+        visited: false
+      };
+    });
+
+    this.passiveOverlay = overlay;
+    this.passiveDots = dots;
+    this.passiveCallbacks = { onProgress, onComplete };
+    this.passiveCompleted = false;
+
+    const remaining = dots.filter((dot) => !dot.visited).length;
+    onProgress?.(remaining);
+  }
+
+  stopPassiveBootstrap() {
+    if (this.passiveOverlay && this.passiveOverlay.parentNode) {
+      this.passiveOverlay.parentNode.removeChild(this.passiveOverlay);
+    }
+    this.passiveOverlay = null;
+    this.passiveDots = [];
+    this.passiveCallbacks = null;
+    this.passiveCompleted = true;
+  }
+
+  registerPassiveClick({ x, y }) {
+    if (!this.passiveOverlay || !this.passiveDots.length) {
+      return null;
+    }
+
+    const rect = this.stageEl.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return null;
+    }
+
+    const localX = (x - rect.left) / rect.width;
+    const localY = (y - rect.top) / rect.height;
+    const maxDistance = 0.12;
+
+    let hit = null;
+    let shortest = Number.POSITIVE_INFINITY;
+
+    for (const dot of this.passiveDots) {
+      if (dot.visited) {
+        continue;
+      }
+      const dx = localX - dot.x;
+      const dy = localY - dot.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < shortest && distance <= maxDistance) {
+        shortest = distance;
+        hit = dot;
+      }
+    }
+
+    if (hit) {
+      hit.visited = true;
+      hit.element.dataset.state = 'visited';
+    }
+
+    const remaining = this.passiveDots.filter((dot) => !dot.visited).length;
+    if (remaining === 0 && !this.passiveCompleted) {
+      this.passiveCompleted = true;
+      this.passiveCallbacks?.onComplete?.();
+      this.stopPassiveBootstrap();
+      return { hit: Boolean(hit), remaining: 0, completed: true };
+    }
+
+    this.passiveCallbacks?.onProgress?.(remaining);
+    return { hit: Boolean(hit), remaining, completed: false };
+  }
+
+  refreshPassiveBootstrap() {
+    if (!this.passiveOverlay || !this.passiveDots.length) {
+      return;
+    }
+
+    const points = this.generatePassivePoints(this.passiveDots.length);
+    this.passiveDots.forEach((dot, index) => {
+      const point = points[index];
+      if (!point) {
+        return;
+      }
+      dot.x = point.x;
+      dot.y = point.y;
+      dot.element.style.left = `${(point.x * 100).toFixed(2)}%`;
+      dot.element.style.top = `${(point.y * 100).toFixed(2)}%`;
+      dot.element.style.setProperty('--dot-color', point.color ?? '#4fc3f7');
+    });
+  }
+
+  generatePassivePoints(count = 9) {
+    const rect = this.stageEl.getBoundingClientRect();
+    const width = rect.width || window.innerWidth || 1;
+    const height = rect.height || window.innerHeight || 1;
+    const radius = Math.min(width, height) * 0.24;
+    const colors = DEFAULT_NOTES.map((note) => note.color).filter(Boolean);
+
+    const points = [];
+    const centerX = 0.5;
+    const centerY = 0.5;
+    points.push({ x: centerX, y: centerY, color: colors[0] ?? '#4fc3f7' });
+
+    const ringCount = Math.max(0, count - 1);
+    for (let i = 0; i < ringCount; i += 1) {
+      const angle = (i / ringCount) * Math.PI * 2 - Math.PI / 2;
+      const offsetX = (Math.cos(angle) * radius) / width;
+      const offsetY = (Math.sin(angle) * radius) / height;
+      const color = colors[(i + 1) % colors.length] ?? '#fbc02d';
+      points.push({
+        x: centerX + offsetX,
+        y: centerY + offsetY,
+        color
+      });
+    }
+
+    return points;
   }
 }
 

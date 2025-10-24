@@ -28,7 +28,9 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - **Web Audio API:** geração e mixagem de sons terapêuticos.
 - **Pipeline de câmera resiliente:** captura com `getUserMedia` assíncrono, verificação de metadata e fallback por mouse quando permissões falham.
 - **Refino ocular híbrido:** coordenadas do WebGazer suavizadas com centros de íris do MediaPipe Face Mesh.
-- **Calibração multi-ponto guiada:** grade 3x3 integrada à pizza com confirmação por piscadas e persistência local.
+- **Calibração passiva multi-ponto:** grade 3x3 aparece automaticamente sobre a pizza, orienta os primeiros cliques e confirma cada amostra com piscadas voluntárias.
+- **Aprendizado contínuo por cliques:** cada clique válido na interface alimenta o `webgazer.recordScreenPosition`, com reforço por piscada e throttle de 420 ms para evitar ruído.
+- **Persistência inteligente:** estado de bootstrap e pesos do modelo são salvos em `localStorage` (`terraCalibrationBootstrapped`), recuperando a calibração nas sessões seguintes.
 - **Rastreamento de íris refinado:** MediaPipe Face Mesh em modo `refineLandmarks` com ROI dedicado nos olhos e suavização exponencial (<2° de erro em condições padrão).
 - **Cursor acessível de gaze:** visualização contínua com `#gaze-cursor` e heatmap com decaimento visual.
 - **Feedback visual do olhar:** cursor vermelho (setGazeListener) e SVG de olho animado com pupila móvel; piscadas disparam animação sincronizada com o detector.
@@ -45,16 +47,16 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 [Permissão da webcam] -- getUserMedia --> [Stream de vídeo]
           |
           v
-[WebGazer.js] -- calibração "pizza" --> [Modelo de gaze calibrado]
+[WebGazer.js] -- bootstrap passivo 3×3 --> [Modelo de gaze calibrado]
           |
           v
-[Mapeamento do olhar] -- focos/piscadas --> [Triggers musicais + feedback visual]
+[Aprendizado contínuo] -- focos/piscadas --> [Triggers musicais + feedback visual]
 
 ### Pipeline combinado de rastreamento (2025)
 
-1. **WebGazer.js (gaze absoluto):** mapeia coordenadas de olhar após calibração com os setores da pizza.
+1. **WebGazer.js (gaze absoluto):** mapeia coordenadas de olhar após bootstrap passivo na grade 3×3 e reforço contínuo com cliques na pizza.
 2. **MediaPipe Face Mesh (biometria ocular):** processa o mesmo stream para obter EAR (Eye Aspect Ratio) e centro das íris.
-3. **Blink Detector adaptativo:** usa o EAR do Face Mesh com thresholds de `APP_CONFIG` para disparar piscadas voluntárias.
+3. **Blink Detector adaptativo:** usa o EAR do Face Mesh com thresholds de `APP_CONFIG` para validar piscadas voluntárias (confirmação da amostra e comandos secundários).
 4. **Fallback inteligente:** se o Face Mesh não iniciar, o detector volta ao rastreador CLM padrão do WebGazer.
 5. **Heatmap terapêutico:** pontos de gaze alimentam `HeatmapRenderer`, gerando reforço visual suavizado com decaimento contínuo.
 ```
@@ -175,9 +177,12 @@ oscillator.stop(audioContext.currentTime + 1.5);
 
   `npm run setup` executa `script/setup-webgazer.*` e baixa `libs/webgazer.js`. Os scripts usam `python -m http.server` para servir a pasta raiz (porta 8000 por padrão).
 
-1. **Acesso pelo navegador** — Abra `http://localhost:8000` no Chrome ou Edge e autorize o uso da webcam quando solicitado; o preview aparece ao centro e o cursor de gaze surge após a calibração.
-2. **Calibração com a pizza colorida** — Aguarde ~2 segundos para o carregamento do WebGazer. Toque em **Calibrar** e siga a grade 3×3 de alvos na pizza: mantenha o olhar em cada ponto e pisque uma vez para registrá-lo (9 piscadas no total). O status confirma cada captura e o modelo ajustado é salvo localmente para as próximas sessões.
-3. **Interação terapêutica** — Com o rastreamento ativo, mire o olhar nas fatias para pré-ouvir notas, pisque deliberadamente para selecionar uma fatia (o sistema dispara cliques sintéticos) e aproveite o modo tela cheia (`js/fullscreen.js`) para maior imersão.
+1. **Acesso pelo navegador** — Abra `http://localhost:8000` no Chrome ou Edge e autorize o uso da webcam quando solicitado; o preview aparece ao centro e o cursor de gaze já exibe a posição estimada com pré-visualização dourada.
+2. **Bootstrap passivo de calibração** — Assim que o WebGazer inicializa, uma grade 3×3 aparece sobre a pizza. Clique em cada alvo quando ele estiver sob o seu foco visual e pisque uma vez para confirmar o ponto. Após as 9 amostras, o overlay some e o status indica "Calibração concluída" (o progresso é salvo localmente).
+3. **Aprendizado contínuo** — Continue usando a interface normalmente: cada clique válido reforça o modelo, desde que você mantenha o olhar no mesmo ponto e confirme com uma piscada. Se mover a janela ou redimensionar, a grade pode retornar rapidamente para coletar novos pontos.
+4. **Interação terapêutica** — Com o rastreamento estável, mire o olhar nas fatias para pré-ouvir notas, use piscadas deliberadas como gatilho de seleção e ative o modo tela cheia (`js/fullscreen.js`) para maior imersão.
+
+> **Nota:** a flag `terraCalibrationBootstrapped` é gravada no `localStorage` assim que a grade é concluída. Limpe-a (via DevTools ou `localStorage.removeItem('terraCalibrationBootstrapped')`) para forçar um novo bootstrap completo.
 
 ## Erros Comuns e Soluções
 
@@ -186,8 +191,9 @@ oscillator.stop(audioContext.currentTime + 1.5);
 | Webcam não inicia | Permissão negada ou browser incompatível | Alertas guiados com try/catch; conceda permissão ou utilize o fallback por mouse para testar a interface. |
 | WebGazer ausente | `libs/webgazer.js` não encontrado no servidor local | Rodar `npm run setup` ou executar `script/setup-webgazer.bat`/`.sh` para baixar a dependência. |
 | WebGazer 404/ não carrega | Caminho incorreto ou arquivo ausente | Download local automatizado com fallback CDN e Promise de carregamento com timeout. |
-| Calibração imprecisa | Iluminação irregular ou reflexos | Usar iluminação difusa, evitar óculos espelhados, repetir calibração. |
-| Calibração falha | Pontos insuficientes ou modelo sem íris refinada | Execute a rotina 9-pontos com piscadas e confirme que `refineLandmarks` está ativo (reinicie a calibração se necessário). |
+| Calibração imprecisa | Iluminação irregular ou reflexos | Use iluminação difusa, evite óculos espelhados, repita alguns cliques nos alvos da grade e confirme com piscadas para reforçar o modelo. |
+| Calibração falha | Pontos insuficientes ou modelo sem íris refinada | Aguarde a grade reaparecer (ou acione `localStorage.removeItem('terraCalibrationBootstrapped')`) e registre novamente os nove pontos com foco + piscada; valide se `refineLandmarks` está ativo. |
+| Bootstrap não aparece | `terraCalibrationBootstrapped` mantido entre sessões mesmo após mover a UI | Limpe o item de `localStorage`, recarregue a página ou abra em aba anônima para forçar o bootstrap passivo. |
 | Confiança do gaze baixa | Usuário muito distante da webcam | Ajustar posição, aumentar brilho, recalibrar. |
 | Latência ou cortes de áudio | Contexto suspenso ou excesso de osciladores | Chamar `audioContext.resume()`, limitar notas simultâneas, usar `stopAll()`. |
 | Travamentos em browsers específicos | Falta de suporte ao WebGazer/WebGL | Priorizar Chrome/Edge, detectar `navigator.userAgent` para ocultar features incompatíveis. |

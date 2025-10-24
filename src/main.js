@@ -125,10 +125,16 @@ class TerraVisionCore {
   this.mouseFallbackEnabled = false;
   this.mouseFallbackCleanup = null;
   this.webcamReadyHandled = false;
+    this.pendingBlinkValidation = [];
+    this.passiveLearningEnabled = true;
+    this.passiveThrottleMs = 420;
+    this.lastPassiveSampleAt = 0;
+    this.isBootstrapComplete = Boolean(localStorage.getItem('terraCalibrationBootstrapped') === 'true');
 
     this.handleGaze = this.handleGaze.bind(this);
     this.handleBlink = this.handleBlink.bind(this);
   this.onWebcamLoaded = this.onWebcamLoaded.bind(this);
+    this.handlePassiveClick = this.handlePassiveClick.bind(this);
   }
 
   async init() {
@@ -142,6 +148,20 @@ class TerraVisionCore {
       () => this.rawGaze,
       (message) => this.ui.updateStatus(message)
     );
+
+    if (!this.isBootstrapComplete) {
+      this.calibration.startPassiveBootstrap({
+        pointCount: 9,
+        onProgress: (remaining) => {
+          if (remaining > 0) {
+            this.ui.updateStatus(`Clique nos ${remaining} pontos destacados para ensinar o sistema.`);
+          }
+        },
+        onComplete: () => {
+          this.markBootstrapComplete();
+        }
+      });
+    }
 
     this.gazeTracker = new GazeTracker({
       onGaze: this.handleGaze,
@@ -169,9 +189,14 @@ class TerraVisionCore {
 
     this.setupEventHandlers();
     this.setupResizeHandling();
+    this.registerPassiveCalibration();
 
     if (!this.warnIfInsecureContext()) {
-      this.ui.updateStatus('A câmera abrirá automaticamente; foque na pizza para começar a tocar com piscadas.');
+      if (this.isBootstrapComplete) {
+        this.ui.updateStatus('Clique onde olhar para continuar ensinando o sistema enquanto toca com piscadas.');
+      } else {
+        this.ui.updateStatus('Clique nos pontos da pizza para o aprendizado inicial do gaze.');
+      }
     }
 
     const cameraReady = await this.initCamera();
@@ -203,10 +228,6 @@ class TerraVisionCore {
   }
 
   setupEventHandlers() {
-    this.ui.onCalibrate(async () => {
-      await this.handleControlActivation('calibrate', 'click');
-    });
-
     document.addEventListener('keydown', (event) => {
       if (event.key === 'f') {
         this.requestFullscreen();
@@ -242,10 +263,75 @@ class TerraVisionCore {
     document.addEventListener('pointerdown', handleInteraction, { once: true });
   }
 
+  registerPassiveCalibration() {
+    if (!this.passiveLearningEnabled) {
+      return;
+    }
+
+    document.removeEventListener('click', this.handlePassiveClick, true);
+    document.addEventListener('click', this.handlePassiveClick, true);
+  }
+
+  handlePassiveClick(event) {
+    if (!this.passiveLearningEnabled || !window.webgazer) {
+      return;
+    }
+    if (event.button !== 0) {
+      return;
+    }
+
+    const now = performance.now();
+    if (now - this.lastPassiveSampleAt < this.passiveThrottleMs) {
+      return;
+    }
+    this.lastPassiveSampleAt = now;
+
+    const x = event.clientX;
+    const y = event.clientY;
+    const stageRect = this.ui.stageEl?.getBoundingClientRect();
+    if (stageRect) {
+      const insideStage = x >= stageRect.left && x <= stageRect.right && y >= stageRect.top && y <= stageRect.bottom;
+      if (!insideStage) {
+        return;
+      }
+    }
+    const eyeState = this.gazeTracker?.getCurrentEyeState?.() ?? null;
+
+    try {
+      window.webgazer.recordScreenPosition?.(x, y, 'click', eyeState ?? undefined);
+      if (window.webgazer.saveModelToLocalStorage) {
+        window.webgazer.saveModelToLocalStorage();
+      }
+      console.log('[PassiveCalibration] Aprendido passivamente em', x, y);
+    } catch (error) {
+      console.warn('[PassiveCalibration] Falha ao registrar clique', error);
+    }
+
+    this.pendingBlinkValidation.push({
+      timestamp: now,
+      x,
+      y,
+      validated: false,
+      eyeState
+    });
+
+    this.updateSliceFromScreenPoint({ x, y });
+
+    if (!this.isBootstrapComplete) {
+      const progress = this.calibration?.registerPassiveClick({ x, y });
+      if (progress?.completed) {
+        this.markBootstrapComplete();
+      } else if (progress && Number.isFinite(progress.remaining) && progress.remaining > 0) {
+        this.ui.updateStatus(`Restam ${progress.remaining} pontos para concluir o aprendizado inicial.`);
+      }
+    }
+  }
+
   setupResizeHandling() {
     window.addEventListener('resize', () => {
       this.renderer?.resize();
       this.controlManager?.refreshRects();
+      this.calibration?.refreshPassiveBootstrap?.();
     });
   }
 
@@ -498,13 +584,7 @@ class TerraVisionCore {
       return;
     }
     this.ui.triggerBlinkAnimation();
-    if (this.isCalibrating) {
-      const consumed = this.calibration?.registerBlink?.();
-      if (consumed) {
-        this.ui.updateStatus('Piscada registrada. Mantenha o olhar no alvo até o próximo ponto.');
-        return;
-      }
-    }
+    this.validateRecentPassiveSample();
     this.triggerBlinkInteraction();
     if (this.controlManager?.handleBlink()) {
       this.audio.playFrequency(880, 0.12);
@@ -536,6 +616,44 @@ class TerraVisionCore {
       clientY: gazeSource.y
     });
     target.dispatchEvent(clickEvent);
+  }
+
+  validateRecentPassiveSample() {
+    if (!this.pendingBlinkValidation.length || typeof window.webgazer?.getRegressionModel !== 'function') {
+      return;
+    }
+
+    const now = performance.now();
+    const windowMs = 520;
+    const latest = [...this.pendingBlinkValidation].reverse().find((sample) => !sample.validated && now - sample.timestamp <= windowMs);
+    if (!latest) {
+      this.pendingBlinkValidation = this.pendingBlinkValidation.filter((sample) => now - sample.timestamp <= windowMs * 2);
+      return;
+    }
+
+    latest.validated = true;
+    try {
+      const model = window.webgazer.getRegressionModel?.();
+      if (model?.addSample && latest.eyeState) {
+        model.addSample(latest.eyeState, { x: latest.x, y: latest.y });
+      }
+      window.webgazer.saveModelToLocalStorage?.();
+      this.ui.updateStatus('Clique confirmado por piscada. Modelo reforçado.');
+    } catch (error) {
+      console.warn('[PassiveCalibration] Reforço por piscada falhou', error);
+    }
+
+    this.pendingBlinkValidation = this.pendingBlinkValidation.filter((sample) => now - sample.timestamp <= windowMs * 2);
+  }
+
+  markBootstrapComplete() {
+    if (this.isBootstrapComplete) {
+      return;
+    }
+    this.isBootstrapComplete = true;
+    localStorage.setItem('terraCalibrationBootstrapped', 'true');
+    this.calibration?.stopPassiveBootstrap?.();
+    this.ui.updateStatus('Aprendizado inicial concluído. Continue clicando e piscando para refinar o modelo.');
   }
 
   updateSliceFromScreenPoint(point) {

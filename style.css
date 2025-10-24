@@ -352,34 +352,6 @@ body {
   min-width: 240px;
 }
 
-.calibrate-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: rgba(79, 195, 247, 0.18);
-  color: var(--text-primary);
-  border: 1px solid rgba(79, 195, 247, 0.45);
-  border-radius: 999px;
-  padding: 0.55rem 1.4rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-}
-
-.calibrate-chip:hover,
-.calibrate-chip:focus-visible {
-  background: rgba(79, 195, 247, 0.32);
-  border-color: rgba(79, 195, 247, 0.85);
-  transform: translateY(-1px);
-}
-
-.calibrate-chip:active {
-  transform: translateY(0);
-}
-
 .calibration-overlay {
   position: absolute;
   inset: 0;
@@ -390,6 +362,67 @@ body {
   backdrop-filter: blur(2px);
   z-index: 6;
   pointer-events: auto;
+}
+
+.passive-bootstrap-overlay {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  z-index: 7;
+  font-family: var(--font-family);
+}
+
+.passive-bootstrap-instruction {
+  position: absolute;
+  top: clamp(1.5rem, 6vh, 3rem);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.75rem 1.75rem;
+  border-radius: 999px;
+  background: rgba(5, 14, 26, 0.78);
+  border: 1px solid rgba(79, 195, 247, 0.35);
+  box-shadow: 0 16px 32px rgba(5, 10, 20, 0.45);
+  font-size: clamp(0.95rem, 2.3vw, 1.1rem);
+  letter-spacing: 0.05em;
+  pointer-events: auto;
+  text-align: center;
+}
+
+.passive-bootstrap-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.passive-bootstrap-dot {
+  position: absolute;
+  width: clamp(28px, 4vw, 44px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, var(--dot-color, #4fc3f7) 0%, rgba(255, 255, 255, 0.12) 85%, transparent 100%);
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 18px rgba(79, 195, 247, 0.32);
+  pointer-events: none;
+  opacity: 0.92;
+  transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
+}
+
+.passive-bootstrap-dot::after {
+  content: '';
+  position: absolute;
+  inset: 18%;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  opacity: 0.6;
+}
+
+.passive-bootstrap-dot[data-state='visited'] {
+  opacity: 0.25;
+  transform: translate(-50%, -50%) scale(0.82);
+  box-shadow: 0 0 12px rgba(110, 230, 150, 0.3);
+  border-color: rgba(110, 230, 150, 0.6);
 }
 
 .calibration-overlay::after {

@@ -17,6 +17,7 @@ export class GazeTracker {
   this.lastFaceMetrics = null;
   this.lastFaceMetricsAt = 0;
   this.refinementAlpha = 0.35;
+  this.lastGaze = null;
   this.roiCanvas = null;
   this.roiContext = null;
   this.filteredGaze = null;
@@ -77,6 +78,8 @@ export class GazeTracker {
 
       const refined = this.refineWithFaceMesh({ ...gaze });
       const smoothed = this.applySmoothing(refined);
+
+      this.lastGaze = { ...smoothed };
 
       if (gaze.confidence < this.minConfidence) {
         this.onGaze?.({ ...smoothed, lowConfidence: true });
@@ -335,5 +338,36 @@ export class GazeTracker {
     } catch (error) {
       console.warn('[GazeTracker][ROI]', error);
     }
+  }
+
+  getCurrentEyeState() {
+    const metrics = this.lastFaceMetrics;
+
+    const clonePoint = (point) => (point ? { ...point } : null);
+    const cloneBox = (box) =>
+      box
+        ? {
+            minX: box.minX,
+            minY: box.minY,
+            maxX: box.maxX,
+            maxY: box.maxY
+          }
+        : null;
+
+    return {
+      timestamp: performance.now(),
+      gaze: this.lastGaze ? { ...this.lastGaze } : null,
+      metrics: metrics
+        ? {
+            ear: metrics.ear,
+            leftEar: metrics.leftEar,
+            rightEar: metrics.rightEar,
+            irisLeft: clonePoint(metrics.irisLeft),
+            irisRight: clonePoint(metrics.irisRight),
+            gaze: clonePoint(metrics.gaze),
+            roi: cloneBox(metrics.roi)
+          }
+        : null
+    };
   }
 }
