@@ -5,7 +5,6 @@ import { PizzaRenderer } from './pizzaRenderer.js';
 import { UIManager } from './ui.js';
 import { CalibrationManager } from './calibration.js';
 import { GazeTracker } from './gazeTracker.js';
-import CameraPreview from './cameraPreview.js';
 
 class TerraVisionCore {
   constructor() {
@@ -16,8 +15,8 @@ class TerraVisionCore {
     this.calibration = null;
     this.controlManager = null;
     this.gazeTracker = null;
-    this.cameraPreview = null;
-    this.cameraStats = null;
+    this.webcamEl = null;
+    this.cameraStream = null;
 
     this.lastGaze = null;
     this.rawGaze = null;
@@ -49,10 +48,10 @@ class TerraVisionCore {
       announce: (message) => this.ui.updateStatus(message)
     });
 
-    this.cameraPreview = new CameraPreview({
-      onStatusChange: (event) => this.handleCameraStatus(event)
-    });
-    this.ui.attachCameraPreview(this.cameraPreview.getVideoElement());
+    this.webcamEl = document.getElementById('webcam');
+    if (this.webcamEl) {
+      this.ui.attachCameraPreview(this.webcamEl);
+    }
 
     const buttons = this.ui.getControlButtons();
     if (buttons.length) {
@@ -71,13 +70,13 @@ class TerraVisionCore {
     this.setupResizeHandling();
 
     if (!this.warnIfInsecureContext()) {
-      this.ui.updateStatus('Olhe para a pizza colorida e use o alvo central para calibrar quando desejar.');
+      this.ui.updateStatus('A câmera abrirá automaticamente; foque na pizza para começar a tocar com piscadas.');
     }
 
-    await this.ensureCameraPreview();
-    if (this.cameraPreview?.isActive()) {
-      this.gazeTracker.setVideoElement(this.cameraPreview.getVideoElement());
-      this.gazeTracker.setVideoStream(this.cameraPreview.getStream());
+    const cameraReady = await this.initCamera();
+    if (cameraReady && this.webcamEl) {
+      this.gazeTracker.setVideoElement(this.webcamEl);
+      this.gazeTracker.setVideoStream(this.cameraStream);
     }
 
     const trackingStarted = await this.startTracking();
@@ -126,6 +125,11 @@ class TerraVisionCore {
     const handleInteraction = async () => {
       document.removeEventListener('pointerdown', handleInteraction);
       this.autoStartRegistered = false;
+      await this.initCamera(true);
+      if (this.webcamEl) {
+        this.gazeTracker.setVideoElement(this.webcamEl);
+        this.gazeTracker.setVideoStream(this.cameraStream);
+      }
       const started = await this.startTracking();
       if (!started) {
         this.registerAutoStartFallback();
@@ -142,38 +146,55 @@ class TerraVisionCore {
     });
   }
 
-  async ensureCameraPreview() {
-    if (!this.cameraPreview) {
-      return false;
-    }
-    if (this.cameraPreview.isActive()) {
+  async initCamera(force = false) {
+    if (this.cameraStream && !force) {
       return true;
     }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      this.ui.updateStatus('Seu navegador não suporta captura de vídeo com getUserMedia.');
+      return false;
+    }
+    if (!this.webcamEl) {
+      this.webcamEl = document.getElementById('webcam');
+      if (this.webcamEl) {
+        this.ui.attachCameraPreview(this.webcamEl);
+      }
+    }
+    if (!this.webcamEl) {
+      this.ui.updateStatus('Elemento de vídeo não encontrado para iniciar a câmera.');
+      return false;
+    }
+
     try {
-      await this.cameraPreview.start();
-      this.ui.toggleCameraPreview(true);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'user',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        },
+        audio: false
+      });
+
+      this.cameraStream?.getTracks?.().forEach((track) => track.stop());
+      this.cameraStream = stream;
+      this.webcamEl.srcObject = stream;
+
+      const playPromise = this.webcamEl.play?.();
+      if (playPromise instanceof Promise) {
+        await playPromise.catch(() => {});
+      }
+
+      this.webcamEl.style.display = 'block';
       return true;
     } catch (error) {
-      console.warn('Não foi possível iniciar a pré-visualização da câmera.', error);
-      this.ui.updateStatus('Não conseguimos iniciar a pré-visualização da câmera. Verifique permissões.');
+      console.error('Falha ao iniciar a câmera:', error);
+      this.ui.updateStatus('Permita o acesso à câmera para ativar o rastreamento ocular.');
+      try {
+        alert('Permita o acesso à câmera para o rastreamento por olhar.');
+      } catch (alertError) {
+        console.warn('Não foi possível exibir alerta de permissão.', alertError);
+      }
       return false;
-    }
-  }
-
-  handleCameraStatus(event) {
-    if (!event) {
-      return;
-    }
-    if (event.type === 'stats') {
-      this.cameraStats = event.stats;
-      return;
-    }
-    if (event.type === 'hint' && event.value) {
-      this.ui.updateStatus(event.value);
-      return;
-    }
-    if (event.type === 'error') {
-      this.ui.updateStatus('Falha ao acessar a câmera. Ajuste permissões e tente novamente.');
     }
   }
 
@@ -221,14 +242,24 @@ class TerraVisionCore {
       if (!hasWebGazer) {
         throw new Error('WebGazer não carregou.');
       }
-      await this.requestCameraPermission();
+      const cameraReady = await this.initCamera();
+      if (!cameraReady) {
+        throw new Error('Não foi possível iniciar a câmera.');
+      }
       await this.audio.ensureRunning();
+
+      if (this.webcamEl) {
+        this.gazeTracker.setVideoElement(this.webcamEl);
+      }
+      if (this.cameraStream) {
+        this.gazeTracker.setVideoStream(this.cameraStream);
+      }
 
       this.gazeTracker.setConfidenceThreshold(APP_CONFIG.minConfidence);
       await this.gazeTracker.setup();
       this.gazeTracker.startBlinkDetector();
 
-  this.isTracking = true;
+    this.isTracking = true;
       this.ui.updateStatus('Rastreamento ativo. Foque em uma fatia colorida e pisque para tocar.');
       return true;
     } catch (error) {
@@ -256,22 +287,6 @@ class TerraVisionCore {
       }
     }
     return Boolean(window.webgazer);
-  }
-
-  async requestCameraPermission() {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('API getUserMedia indisponível neste navegador.');
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
-        audio: false
-      });
-      stream.getTracks().forEach((track) => track.stop());
-    } catch (error) {
-      throw new Error('Permissão de câmera negada ou indisponível.');
-    }
   }
 
   handleGaze(data) {

@@ -1,8 +1,11 @@
 export class UIManager {
   constructor() {
     this.stageEl = document.querySelector('.stage');
+    this.stageCenter = document.querySelector('.stage-center');
     this.statusEl = document.getElementById('status');
+    this.statusMessageEl = document.getElementById('status-text');
     this.gazeDot = document.getElementById('gaze-dot');
+    this.gazeCursor = document.getElementById('gazeCursor');
     this.calibrateButton = document.querySelector('[data-action="calibrate"]');
     this.gazeState = 'idle';
     this.gazeFlashTimeout = null;
@@ -35,6 +38,10 @@ export class UIManager {
   }
 
   updateStatus(message) {
+    if (this.statusMessageEl) {
+      this.statusMessageEl.textContent = message;
+      return;
+    }
     if (this.statusEl) {
       this.statusEl.textContent = message;
     }
@@ -42,11 +49,17 @@ export class UIManager {
 
   updateGazeDot(point, { state, clampToStage = true } = {}) {
     if (!this.gazeDot || !this.stageEl) {
+      if (this.gazeCursor) {
+        delete this.gazeCursor.dataset.active;
+      }
       return;
     }
     if (!point) {
       this.setGazeState('lost');
       this.gazeDot.style.opacity = '0';
+      if (this.gazeCursor) {
+        delete this.gazeCursor.dataset.active;
+      }
       return;
     }
     const rect = this.stageEl.getBoundingClientRect();
@@ -71,6 +84,12 @@ export class UIManager {
     this.gazeDot.style.opacity = '1';
     this.gazeDot.style.left = `${x}px`;
     this.gazeDot.style.top = `${y}px`;
+
+    if (this.gazeCursor) {
+      this.gazeCursor.style.left = `${point.x}px`;
+      this.gazeCursor.style.top = `${point.y}px`;
+      this.gazeCursor.dataset.active = 'true';
+    }
   }
 
   setGazeState(state) {
@@ -85,8 +104,9 @@ export class UIManager {
     if (!this.stageEl || !videoEl) {
       return;
     }
-    if (!this.stageEl.contains(videoEl)) {
-      this.stageEl.appendChild(videoEl);
+    const target = this.stageCenter || this.stageEl;
+    if (!target.contains(videoEl)) {
+      target.appendChild(videoEl);
     }
     this.cameraPreviewEl = videoEl;
   }
