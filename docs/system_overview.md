@@ -28,6 +28,8 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - **Web Audio API:** geração e mixagem de sons terapêuticos.
 - **Pipeline de câmera resiliente:** captura com `getUserMedia` assíncrono, verificação de metadata e fallback por mouse quando permissões falham.
 - **Refino ocular híbrido:** coordenadas do WebGazer suavizadas com centros de íris do MediaPipe Face Mesh.
+- **Calibração multi-ponto guiada:** grade 3x3 integrada à pizza com confirmação por piscadas e persistência local.
+- **Rastreamento de íris refinado:** MediaPipe Face Mesh em modo `refineLandmarks` com ROI dedicado nos olhos e suavização exponencial (<2° de erro em condições padrão).
 - **Cursor acessível de gaze:** visualização contínua com `#gaze-cursor` e heatmap com decaimento visual.
 - **Feedback visual do olhar:** cursor vermelho (setGazeListener) e SVG de olho animado com pupila móvel; piscadas disparam animação sincronizada com o detector.
 - **Pré-visualização de baixa confiança:** cursor dourado e pontos de predição do WebGazer aparecem mesmo antes da calibração para orientar o usuário.
@@ -174,7 +176,7 @@ oscillator.stop(audioContext.currentTime + 1.5);
   `npm run setup` executa `script/setup-webgazer.*` e baixa `libs/webgazer.js`. Os scripts usam `python -m http.server` para servir a pasta raiz (porta 8000 por padrão).
 
 1. **Acesso pelo navegador** — Abra `http://localhost:8000` no Chrome ou Edge e autorize o uso da webcam quando solicitado; o preview aparece ao centro e o cursor de gaze surge após a calibração.
-2. **Calibração com a pizza colorida** — Aguarde ~2 segundos para o carregamento do WebGazer. Olhe para a tela: o cursor vermelho e a pupila do SVG seguem o gaze enquanto os pontos vermelhos padrão confirmam a predição. Clique em **Calibrar**, fixe o olhar em cada fatia até receber confirmação visual e recorra ao fallback por mouse caso a câmera não esteja disponível. Pisque para acionar os sons terapêuticos quando a fatia desejada estiver em foco.
+2. **Calibração com a pizza colorida** — Aguarde ~2 segundos para o carregamento do WebGazer. Toque em **Calibrar** e siga a grade 3×3 de alvos na pizza: mantenha o olhar em cada ponto e pisque uma vez para registrá-lo (9 piscadas no total). O status confirma cada captura e o modelo ajustado é salvo localmente para as próximas sessões.
 3. **Interação terapêutica** — Com o rastreamento ativo, mire o olhar nas fatias para pré-ouvir notas, pisque deliberadamente para selecionar uma fatia (o sistema dispara cliques sintéticos) e aproveite o modo tela cheia (`js/fullscreen.js`) para maior imersão.
 
 ## Erros Comuns e Soluções
@@ -185,6 +187,7 @@ oscillator.stop(audioContext.currentTime + 1.5);
 | WebGazer ausente | `libs/webgazer.js` não encontrado no servidor local | Rodar `npm run setup` ou executar `script/setup-webgazer.bat`/`.sh` para baixar a dependência. |
 | WebGazer 404/ não carrega | Caminho incorreto ou arquivo ausente | Download local automatizado com fallback CDN e Promise de carregamento com timeout. |
 | Calibração imprecisa | Iluminação irregular ou reflexos | Usar iluminação difusa, evitar óculos espelhados, repetir calibração. |
+| Calibração falha | Pontos insuficientes ou modelo sem íris refinada | Execute a rotina 9-pontos com piscadas e confirme que `refineLandmarks` está ativo (reinicie a calibração se necessário). |
 | Confiança do gaze baixa | Usuário muito distante da webcam | Ajustar posição, aumentar brilho, recalibrar. |
 | Latência ou cortes de áudio | Contexto suspenso ou excesso de osciladores | Chamar `audioContext.resume()`, limitar notas simultâneas, usar `stopAll()`. |
 | Travamentos em browsers específicos | Falta de suporte ao WebGazer/WebGL | Priorizar Chrome/Edge, detectar `navigator.userAgent` para ocultar features incompatíveis. |

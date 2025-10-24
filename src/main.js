@@ -498,6 +498,13 @@ class TerraVisionCore {
       return;
     }
     this.ui.triggerBlinkAnimation();
+    if (this.isCalibrating) {
+      const consumed = this.calibration?.registerBlink?.();
+      if (consumed) {
+        this.ui.updateStatus('Piscada registrada. Mantenha o olhar no alvo até o próximo ponto.');
+        return;
+      }
+    }
     this.triggerBlinkInteraction();
     if (this.controlManager?.handleBlink()) {
       this.audio.playFrequency(880, 0.12);
@@ -622,7 +629,7 @@ class TerraVisionCore {
       this.gazeTracker.setConfidenceThreshold(calibrationThreshold);
     }
     try {
-      this.ui.updateStatus('Calibração iniciada. Olhe para o alvo indicado e clique para prosseguir.');
+      this.ui.updateStatus('Calibração iniciada. Olhe para cada alvo indicado e pisque para registrar.');
       const outcome = await this.calibration.calibrate();
       this.calibrationSummary = outcome;
       if (Number.isFinite(outcome?.averageError)) {

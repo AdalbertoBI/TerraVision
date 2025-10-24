@@ -4,12 +4,14 @@ const LEFT_EYE_INDICES = [33, 160, 158, 133, 153, 144];
 const RIGHT_EYE_INDICES = [362, 385, 387, 263, 373, 380];
 const LEFT_IRIS_INDICES = [468, 469, 470, 471];
 const RIGHT_IRIS_INDICES = [473, 474, 475, 476];
+const LEFT_EYE_BOUNDARY = [33, 7, 163, 144, 145, 153, 154, 155, 133, 246, 161, 160, 159, 158, 157, 173];
+const RIGHT_EYE_BOUNDARY = [263, 249, 390, 373, 374, 380, 381, 382, 362, 466, 388, 387, 386, 385, 384, 398];
 
 const DEFAULT_OPTIONS = {
   maxNumFaces: 1,
   refineLandmarks: true,
-  minDetectionConfidence: 0.5,
-  minTrackingConfidence: 0.5
+  minDetectionConfidence: 0.7,
+  minTrackingConfidence: 0.7
 };
 
 export class FaceMeshProcessor {
@@ -142,6 +144,10 @@ export class FaceMeshProcessor {
     const rightIris = this.averagePoint(landmarks, RIGHT_IRIS_INDICES);
     const gazePoint = this.averagePointFromCoords(leftIris, rightIris);
 
+    const leftBounds = this.computeBounds(landmarks, LEFT_EYE_BOUNDARY, 0.015);
+    const rightBounds = this.computeBounds(landmarks, RIGHT_EYE_BOUNDARY, 0.015);
+    const roiBounds = this.mergeBounds(leftBounds, rightBounds, 0.02);
+
     const metrics = {
       timestamp: performance.now(),
       ear,
@@ -150,6 +156,9 @@ export class FaceMeshProcessor {
       irisLeft: leftIris,
       irisRight: rightIris,
       gaze: gazePoint,
+      roi: roiBounds,
+      roiLeft: leftBounds,
+      roiRight: rightBounds,
       faceGeometry: results?.multiFaceGeometry?.[0] ?? null
     };
 
@@ -228,5 +237,55 @@ export class FaceMeshProcessor {
     const dx = a.x - b.x;
     const dy = a.y - b.y;
     return Math.hypot(dx, dy);
+  }
+
+  computeBounds(landmarks, indices, padding = 0) {
+    const points = indices
+      .map((index) => landmarks[index])
+      .filter(Boolean);
+
+    if (!points.length) {
+      return null;
+    }
+
+    let minX = Number.POSITIVE_INFINITY;
+    let minY = Number.POSITIVE_INFINITY;
+    let maxX = Number.NEGATIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (const point of points) {
+      if (point.x < minX) minX = point.x;
+      if (point.y < minY) minY = point.y;
+      if (point.x > maxX) maxX = point.x;
+      if (point.y > maxY) maxY = point.y;
+    }
+
+    minX = Math.max(0, minX - padding);
+    minY = Math.max(0, minY - padding);
+    maxX = Math.min(1, maxX + padding);
+    maxY = Math.min(1, maxY + padding);
+
+    return { minX, minY, maxX, maxY };
+  }
+
+  mergeBounds(left, right, padding = 0) {
+    if (!left && !right) {
+      return null;
+    }
+    if (left && right) {
+      return {
+        minX: Math.max(0, Math.min(left.minX, right.minX) - padding),
+        minY: Math.max(0, Math.min(left.minY, right.minY) - padding),
+        maxX: Math.min(1, Math.max(left.maxX, right.maxX) + padding),
+        maxY: Math.min(1, Math.max(left.maxY, right.maxY) + padding)
+      };
+    }
+    const bounds = left ?? right;
+    return {
+      minX: Math.max(0, bounds.minX - padding),
+      minY: Math.max(0, bounds.minY - padding),
+      maxX: Math.min(1, bounds.maxX + padding),
+      maxY: Math.min(1, bounds.maxY + padding)
+    };
   }
 }

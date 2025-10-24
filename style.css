@@ -33,6 +33,16 @@ body {
   overflow: hidden;
 }
 
+#roi-canvas {
+  position: absolute;
+  width: 0;
+  height: 0;
+  top: -9999px;
+  left: -9999px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
 #gaze-cursor {
   width: clamp(18px, 2.1vmin, 26px);
   height: clamp(18px, 2.1vmin, 26px);

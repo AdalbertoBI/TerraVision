@@ -18,10 +18,12 @@ export class CalibrationManager {
     this.stageEl = stageEl;
     this.getGaze = getGazeFn;
     this.announce = announcer;
-  this.sampleWindow = 1200;
-  this.minSamplesPerPoint = 6;
+  this.sampleWindow = 1600;
+  this.minSamplesPerPoint = 12;
     this.model = new CalibrationModel();
     this.errorThreshold = 65;
+    this.blinkTrigger = null;
+    this.activeOverlay = null;
     this.loadFromStorage();
   }
 
@@ -72,13 +74,14 @@ export class CalibrationManager {
   async calibrate() {
     const overlay = this.buildOverlay();
     this.stageEl.appendChild(overlay);
-    this.announce?.('Mire o olhar no alvo indicado e clique para registrar cada ponto.');
+    this.activeOverlay = overlay;
+    this.announce?.('Mire o olhar no alvo indicado e pisque para registrar cada ponto.');
 
     this.model.reset();
     let recordedSamples = 0;
 
     for (const [index, point] of CALIBRATION_POINTS.entries()) {
-      this.updateInstruction(overlay, `Ponto ${index + 1} de ${CALIBRATION_POINTS.length}. Clique no alvo.`);
+      this.updateInstruction(overlay, `Ponto ${index + 1} de ${CALIBRATION_POINTS.length}. Olhe e pisque para registrar.`);
       const sample = await this.collectPoint(overlay, point);
       if (sample) {
         recordedSamples += 1;
@@ -87,6 +90,8 @@ export class CalibrationManager {
     }
 
     overlay.remove();
+    this.activeOverlay = null;
+    this.blinkTrigger = null;
 
     if (!recordedSamples) {
       throw new Error('Nenhum dado coletado para calibração.');
@@ -109,12 +114,12 @@ export class CalibrationManager {
 
     const instruction = document.createElement('p');
     instruction.className = 'calibration-instruction';
-    instruction.textContent = 'Olhe para o alvo e clique para registrar.';
+    instruction.textContent = 'Olhe para o alvo e pisque para registrar.';
 
     const marker = document.createElement('button');
     marker.type = 'button';
     marker.className = 'calibration-target';
-    marker.setAttribute('aria-label', 'Clique para registrar calibração');
+    marker.setAttribute('aria-label', 'Pisque ou clique para registrar calibração');
     marker.dataset.phase = 'armed';
     marker.textContent = '●';
 
@@ -152,6 +157,10 @@ export class CalibrationManager {
       let collecting = false;
       let activePointerId = null;
 
+      const setBlinkTrigger = () => {
+        this.blinkTrigger = () => startCollection({ type: 'blink' });
+      };
+
       const releasePointer = () => {
         if (activePointerId !== null && marker.releasePointerCapture && marker.hasPointerCapture?.(activePointerId)) {
           marker.releasePointerCapture(activePointerId);
@@ -165,6 +174,7 @@ export class CalibrationManager {
         marker.removeEventListener('touchstart', handleTouchStart);
         marker.removeEventListener('click', handleClickFallback);
         marker.removeEventListener('keydown', handleKeyDown);
+        this.blinkTrigger = null;
       };
 
       const rearmTarget = () => {
@@ -173,6 +183,8 @@ export class CalibrationManager {
         overlay.dataset.state = 'active';
         marker.dataset.phase = 'armed';
         marker.textContent = '●';
+        setBlinkTrigger();
+        this.updateInstruction(overlay, 'Olhe e pisque para confirmar este ponto.');
         requestAnimationFrame(() => {
           try {
             marker.focus({ preventScroll: true });
@@ -191,6 +203,7 @@ export class CalibrationManager {
         collecting = true;
         event?.preventDefault();
         event?.stopPropagation();
+        this.blinkTrigger = null;
 
         if (event?.type === 'pointerdown') {
           activePointerId = event.pointerId ?? null;
@@ -209,7 +222,7 @@ export class CalibrationManager {
         marker.disabled = true;
         marker.dataset.phase = 'collecting';
         marker.textContent = '⌛';
-        this.updateInstruction(overlay, 'Mantenha o olhar no alvo. Coletando dados...');
+  this.updateInstruction(overlay, 'Mantenha o olhar no alvo. Coletando dados após a piscada...');
 
         const rawSamples = [];
         const start = performance.now();
@@ -245,6 +258,8 @@ export class CalibrationManager {
             averagedRaw.x /= rawSamples.length;
             averagedRaw.y /= rawSamples.length;
 
+            window.webgazer?.recordScreenPosition?.(targetX, targetY, 'blink');
+
             overlay.dataset.state = 'cooldown';
             marker.dataset.phase = 'confirmed';
             marker.textContent = '✔';
@@ -263,7 +278,7 @@ export class CalibrationManager {
 
             if (!rawSamples.length) {
               releasePointer();
-              this.updateInstruction(overlay, 'Não registramos o olhar. Ajuste sua posição e clique novamente.');
+              this.updateInstruction(overlay, 'Não registramos o olhar. Ajuste sua posição e pisque novamente.');
               rearmTarget();
               return;
             }
@@ -279,6 +294,8 @@ export class CalibrationManager {
 
             averagedRaw.x /= rawSamples.length;
             averagedRaw.y /= rawSamples.length;
+
+            window.webgazer?.recordScreenPosition?.(targetX, targetY, 'blink');
 
             overlay.dataset.state = 'cooldown';
             marker.dataset.phase = 'confirmed';
@@ -326,6 +343,7 @@ export class CalibrationManager {
   marker.addEventListener('touchstart', handleTouchStart, { passive: false });
       marker.addEventListener('click', handleClickFallback);
       marker.addEventListener('keydown', handleKeyDown);
+      setBlinkTrigger();
 
       try {
         marker.focus({ preventScroll: true });
@@ -333,6 +351,14 @@ export class CalibrationManager {
         marker.focus?.();
       }
     });
+  }
+
+  registerBlink() {
+    if (typeof this.blinkTrigger === 'function') {
+      this.blinkTrigger();
+      return true;
+    }
+    return false;
   }
 }
 
