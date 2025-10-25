@@ -1,5 +1,23 @@
 import { APP_CONFIG } from './config.js';
 
+// Silenciar warnings do MediaPipe (OpenGL/WebGL performance warnings normais)
+const originalWarn = console.warn;
+const originalError = console.error;
+console.warn = (...args) => {
+  const msg = args.join(' ');
+  if (msg.includes('WEBGL') || msg.includes('OpenGL') || msg.includes('mediapipe')) {
+    return; // Ignorar warnings de performance do MediaPipe
+  }
+  originalWarn.apply(console, args);
+};
+console.error = (...args) => {
+  const msg = args.join(' ');
+  if (msg.includes('WEBGL_lose_context') || msg.includes('getInternalformatParameter')) {
+    return; // Ignorar erros conhecidos do WebGL
+  }
+  originalError.apply(console, args);
+};
+
 const LEFT_EYE_INDICES = [33, 160, 158, 133, 153, 144];
 const RIGHT_EYE_INDICES = [362, 385, 387, 263, 373, 380];
 const LEFT_IRIS_INDICES = [468, 469, 470, 471];
@@ -11,7 +29,8 @@ const DEFAULT_OPTIONS = {
   maxNumFaces: 1,
   refineLandmarks: true,
   minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.7
+  minTrackingConfidence: 0.7,
+  selfieMode: false
 };
 
 export class FaceMeshProcessor {

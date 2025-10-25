@@ -40,6 +40,13 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 
 ### Melhorias de Calibração e Precisão (Outubro 2025)
 
+**Nota**: Todas as funcionalidades descritas abaixo estão implementadas e testadas. O sistema garante:
+
+- ✅ **AudioContext resume automático** em primeiro gesto (sem warnings de suspended state)
+- ✅ **Cursor de gaze persistente e fluido** (listener único, sem resets em cliques)
+- ✅ **Persistência completa de modelo** (localStorage com save/load automático)
+- ✅ **Logs limpos** (warnings MediaPipe/WebGL filtrados seletivamente)
+
 **Cursor de Gaze Persistente e Fluido:**
 
 - Cursor vermelho customizado (`#gaze-cursor`) sempre visível durante o rastreamento.
@@ -112,6 +119,8 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - Todos os salvamentos de modelo envolvidos em try/catch com logging detalhado.
 - Falhas silenciosas não interrompem fluxo de calibração ou interação.
 - Mensagens de console indicam quando persistência falha para debug.
+- **Warnings do MediaPipe silenciados**: Avisos de performance OpenGL/WebGL normais são filtrados do console para melhor legibilidade dos logs.
+- Filtragem seletiva mantém erros críticos visíveis enquanto remove ruído de otimização do WebGL.
 
 Essas melhorias combinadas resultam em:
 
