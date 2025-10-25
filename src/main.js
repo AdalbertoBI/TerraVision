@@ -299,9 +299,14 @@ class TerraVisionCore {
 
     try {
       window.webgazer.recordScreenPosition?.(x, y, 'click', eyeState ?? undefined);
+      
+      // Salvar modelo persistente após cada clique
       if (window.webgazer.saveModelToLocalStorage) {
-        window.webgazer.saveModelToLocalStorage();
+        window.webgazer.saveModelToLocalStorage().catch((error) => {
+          console.warn('[PassiveCalibration] Falha ao salvar modelo:', error);
+        });
       }
+      
       console.log('[PassiveCalibration] Aprendido passivamente em', x, y);
     } catch (error) {
       console.warn('[PassiveCalibration] Falha ao registrar clique', error);
@@ -637,8 +642,15 @@ class TerraVisionCore {
       if (model?.addSample && latest.eyeState) {
         model.addSample(latest.eyeState, { x: latest.x, y: latest.y });
       }
-      window.webgazer.saveModelToLocalStorage?.();
-      this.ui.updateStatus('Clique confirmado por piscada. Modelo reforçado.');
+      
+      // Salvar modelo após reforço por piscada
+      if (window.webgazer.saveModelToLocalStorage) {
+        window.webgazer.saveModelToLocalStorage().catch((error) => {
+          console.warn('[PassiveCalibration] Falha ao salvar modelo após piscada:', error);
+        });
+      }
+      
+      this.ui.updateStatus('Clique confirmado por piscada. Modelo reforçado e salvo.');
     } catch (error) {
       console.warn('[PassiveCalibration] Reforço por piscada falhou', error);
     }

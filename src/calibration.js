@@ -264,6 +264,17 @@ export class CalibrationManager {
 
             window.webgazer?.recordScreenPosition?.(targetX, targetY, 'blink');
 
+            // Salvar modelo no localStorage após cada ponto bem-sucedido
+            try {
+              if (window.webgazer?.saveModelToLocalStorage) {
+                window.webgazer.saveModelToLocalStorage().catch((error) => {
+                  console.warn('[Calibration] Falha ao salvar modelo:', error);
+                });
+              }
+            } catch (error) {
+              console.warn('[Calibration] Falha ao salvar modelo:', error);
+            }
+
             overlay.dataset.state = 'cooldown';
             marker.dataset.phase = 'confirmed';
             marker.textContent = '✔';
@@ -300,6 +311,17 @@ export class CalibrationManager {
             averagedRaw.y /= rawSamples.length;
 
             window.webgazer?.recordScreenPosition?.(targetX, targetY, 'blink');
+
+            // Salvar modelo no localStorage após cada ponto bem-sucedido
+            try {
+              if (window.webgazer?.saveModelToLocalStorage) {
+                window.webgazer.saveModelToLocalStorage().catch((error) => {
+                  console.warn('[Calibration] Falha ao salvar modelo:', error);
+                });
+              }
+            } catch (error) {
+              console.warn('[Calibration] Falha ao salvar modelo:', error);
+            }
 
             overlay.dataset.state = 'cooldown';
             marker.dataset.phase = 'confirmed';

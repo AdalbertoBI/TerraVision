@@ -38,6 +38,63 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - **Distribuição offline:** `libs/webgazer.js` servido localmente (baixado por `script/setup-webgazer.*`) para preservar privacidade.
 - **Carregamento assíncrono do WebGazer:** Promise única com timeout e fallback automático para CDN oficial quando o arquivo local falha.
 
+### Melhorias de Calibração e Precisão (Outubro 2025)
+
+**Persistência de Modelo com localStorage:**
+
+- Implementado salvamento automático do modelo WebGazer após cada clique de calibração usando `saveModelToLocalStorage()`.
+- Carregamento automático do modelo salvo na inicialização via `loadModelFromLocalStorage()`, eliminando necessidade de recalibração frequente.
+- Modelo persiste entre sessões, mantendo precisão acumulada mesmo após recarregar a página.
+
+**Calibração Sequencial Inteligente:**
+
+- Cliques na pizza registram aprendizado via `webgazer.recordScreenPosition()` com coordenadas exatas do clique.
+- Sistema sequencial de 9 pontos em grade 3×3 que ensina o modelo ponto a ponto.
+- Cada ponto aguarda confirmação por piscada antes de avançar para o próximo.
+- Modelo salvo após cada ponto bem-sucedido, garantindo progresso incremental.
+
+**Reforço por Piscadas:**
+
+- Piscadas detectadas até 520ms após um clique reforçam o aprendizado via `getRegressionModel().addSample()`.
+- Estado ocular capturado (métricas de EAR e posição de íris) vinculado às coordenadas do clique.
+- Modelo salvo automaticamente após cada reforço por piscada.
+- Mensagem de status confirma "Clique confirmado por piscada. Modelo reforçado e salvo."
+
+**Smoothing Exponencial Otimizado:**
+
+- Parâmetro alpha ajustado para 0.3 (nova amostra) / 0.7 (histórico) em `applySmoothing()`.
+- Reduz jitter e tremores no cursor de gaze, proporcionando movimentos mais fluidos.
+- Preserva responsividade enquanto elimina ruído de predições instantâneas.
+- Reset automático do filtro quando gaze é perdido momentaneamente.
+
+**ROI Zoom 2× nos Olhos:**
+
+- Região de interesse (ROI) dos olhos ampliada em 2× antes de processar com WebGazer.
+- Crop centralizado na região ocular a partir dos landmarks do MediaPipe Face Mesh.
+- Sub-canvas de 240×120px dedicado renderiza ROI ampliado sem afetar preview principal.
+- Melhora precisão da detecção de features oculares e tracking de pupila.
+- Processamento via `tracker.processVideo(roiCanvas)` após cada frame do Face Mesh.
+
+**Throttling de Cliques:**
+
+- Intervalo mínimo de 420ms entre cliques passivos para evitar amostras ruidosas.
+- Previne sobrecarga do modelo com dados redundantes ou de baixa qualidade.
+- Mantido mesmo após bootstrap inicial completado.
+
+**Tratamento de Erros Robusto:**
+
+- Todos os salvamentos de modelo envolvidos em try/catch com logging detalhado.
+- Falhas silenciosas não interrompem fluxo de calibração ou interação.
+- Mensagens de console indicam quando persistência falha para debug.
+
+Essas melhorias combinadas resultam em:
+
+- **Calibração mais rápida**: modelo persiste entre sessões.
+- **Maior precisão**: zoom ROI + reforço por piscadas + smoothing exponencial.
+- **Experiência fluida**: cursor suave sem jitter, aprendizado contínuo e transparente.
+- **Robustez**: tratamento de erros impede crashes por falhas de localStorage.
+
+
 ### Fluxo de funcionamento
 
 ```text

@@ -21,7 +21,8 @@ export class GazeTracker {
   this.roiCanvas = null;
   this.roiContext = null;
   this.filteredGaze = null;
-  this.smoothingAlpha = 0.2;
+  this.smoothingAlpha = 0.3;
+  this.roiZoomFactor = 2.0;
   }
 
   setConfidenceThreshold(threshold) {
@@ -62,6 +63,18 @@ export class GazeTracker {
     window.webgazer.showVideo(false);
     window.webgazer.showFaceFeedbackBox(false);
     window.webgazer.showPredictionPoints(false);
+
+    // Carregar modelo salvo do localStorage se disponível
+    try {
+      if (window.webgazer.loadModelFromLocalStorage) {
+        const loaded = await window.webgazer.loadModelFromLocalStorage();
+        if (loaded) {
+          console.log('[GazeTracker] Modelo carregado do localStorage com sucesso.');
+        }
+      }
+    } catch (error) {
+      console.warn('[GazeTracker] Não foi possível carregar modelo do localStorage:', error);
+    }
 
     window.webgazer.setGazeListener((data) => {
       if (!data) {
@@ -240,7 +253,8 @@ export class GazeTracker {
       return { ...gaze };
     }
 
-    const alpha = Number.isFinite(this.smoothingAlpha) ? this.smoothingAlpha : 0.2;
+    // Smoothing exponencial: alpha 0.3 para nova amostra, 0.7 para histórico
+    const alpha = Number.isFinite(this.smoothingAlpha) ? this.smoothingAlpha : 0.3;
     this.filteredGaze.x = this.filteredGaze.x * (1 - alpha) + gaze.x * alpha;
     this.filteredGaze.y = this.filteredGaze.y * (1 - alpha) + gaze.y * alpha;
     const confidence = Math.max(gaze.confidence ?? 0, this.filteredGaze.confidence ?? 0);
@@ -299,15 +313,28 @@ export class GazeTracker {
     const minY = clamp(bounds.minY ?? 0, 0, 1);
     const maxX = clamp(bounds.maxX ?? 1, 0, 1);
     const maxY = clamp(bounds.maxY ?? 1, 0, 1);
-    const width = Math.max(8, Math.round((maxX - minX) * videoWidth));
-    const height = Math.max(8, Math.round((maxY - minY) * videoHeight));
+    let width = Math.max(8, Math.round((maxX - minX) * videoWidth));
+    let height = Math.max(8, Math.round((maxY - minY) * videoHeight));
 
     if (width <= 0 || height <= 0) {
       return;
     }
 
-    const sourceX = Math.round(minX * videoWidth);
-    const sourceY = Math.round(minY * videoHeight);
+    let sourceX = Math.round(minX * videoWidth);
+    let sourceY = Math.round(minY * videoHeight);
+
+    // Aplicar zoom 2x: aumentar região de interesse nos olhos
+    const zoomFactor = this.roiZoomFactor ?? 2.0;
+    const centerX = sourceX + width / 2;
+    const centerY = sourceY + height / 2;
+    const zoomedWidth = Math.round(width * zoomFactor);
+    const zoomedHeight = Math.round(height * zoomFactor);
+    sourceX = Math.max(0, Math.round(centerX - zoomedWidth / 2));
+    sourceY = Math.max(0, Math.round(centerY - zoomedHeight / 2));
+    sourceX = Math.min(sourceX, videoWidth - zoomedWidth);
+    sourceY = Math.min(sourceY, videoHeight - zoomedHeight);
+    width = Math.min(zoomedWidth, videoWidth - sourceX);
+    height = Math.min(zoomedHeight, videoHeight - sourceY);
 
     const targetWidth = 240;
     const aspect = height / width;
@@ -331,6 +358,7 @@ export class GazeTracker {
         targetWidth,
         targetHeight
       );
+      // Passar ROI com zoom para o WebGazer processar
       const tracker = window.webgazer?.getTracker?.();
       if (tracker?.processVideo) {
         tracker.processVideo(this.roiCanvas);
@@ -369,5 +397,46 @@ export class GazeTracker {
           }
         : null
     };
+  }
+
+  async saveModelToStorage() {
+    try {
+      if (window.webgazer?.saveModelToLocalStorage) {
+        await window.webgazer.saveModelToLocalStorage();
+        console.log('[GazeTracker] Modelo salvo no localStorage com sucesso.');
+        return true;
+      }
+    } catch (error) {
+      console.warn('[GazeTracker] Falha ao salvar modelo no localStorage:', error);
+    }
+    return false;
+  }
+
+  async loadModelFromStorage() {
+    try {
+      if (window.webgazer?.loadModelFromLocalStorage) {
+        const loaded = await window.webgazer.loadModelFromLocalStorage();
+        if (loaded) {
+          console.log('[GazeTracker] Modelo carregado do localStorage com sucesso.');
+          return true;
+        }
+      }
+    } catch (error) {
+      console.warn('[GazeTracker] Falha ao carregar modelo do localStorage:', error);
+    }
+    return false;
+  }
+
+  clearStoredModel() {
+    try {
+      if (window.webgazer?.clearData) {
+        window.webgazer.clearData();
+        console.log('[GazeTracker] Modelo limpo do localStorage.');
+        return true;
+      }
+    } catch (error) {
+      console.warn('[GazeTracker] Falha ao limpar modelo:', error);
+    }
+    return false;
   }
 }
