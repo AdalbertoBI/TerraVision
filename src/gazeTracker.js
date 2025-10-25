@@ -358,6 +358,10 @@ export class GazeTracker {
         targetWidth,
         targetHeight
       );
+      
+      // Aplicar contrast enhancement para melhorar detecção dos olhos
+      this.enhanceContrast(this.roiContext, targetWidth, targetHeight);
+      
       // Passar ROI com zoom para o WebGazer processar
       const tracker = window.webgazer?.getTracker?.();
       if (tracker?.processVideo) {
@@ -365,6 +369,34 @@ export class GazeTracker {
       }
     } catch (error) {
       console.warn('[GazeTracker][ROI]', error);
+    }
+  }
+
+  enhanceContrast(context, width, height) {
+    if (!context) {
+      return;
+    }
+
+    try {
+      const imageData = context.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      
+      // Aplicar aumento de contraste simples para melhorar detecção dos olhos
+      const contrastFactor = 1.5;
+      const brightness = 1.1;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        // Converter para escala de cinza e aplicar contraste
+        const gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
+        const enhanced = Math.min(255, Math.max(0, gray * contrastFactor * brightness));
+        
+        data[i] = data[i + 1] = data[i + 2] = enhanced;
+        // Alpha permanece inalterado (data[i + 3])
+      }
+      
+      context.putImageData(imageData, 0, 0);
+    } catch (error) {
+      console.warn('[GazeTracker][enhanceContrast]', error);
     }
   }
 

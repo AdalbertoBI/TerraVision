@@ -148,6 +148,9 @@ export class FaceMeshProcessor {
     const rightBounds = this.computeBounds(landmarks, RIGHT_EYE_BOUNDARY, 0.015);
     const roiBounds = this.mergeBounds(leftBounds, rightBounds, 0.02);
 
+    // Computar direção da íris para refinamento de gaze
+    const irisDirection = this.computeIrisDirection(landmarks, leftIris, rightIris);
+
     const metrics = {
       timestamp: performance.now(),
       ear,
@@ -159,6 +162,7 @@ export class FaceMeshProcessor {
       roi: roiBounds,
       roiLeft: leftBounds,
       roiRight: rightBounds,
+      irisDirection,
       faceGeometry: results?.multiFaceGeometry?.[0] ?? null
     };
 
@@ -287,5 +291,29 @@ export class FaceMeshProcessor {
       maxX: Math.min(1, bounds.maxX + padding),
       maxY: Math.min(1, bounds.maxY + padding)
     };
+  }
+
+  computeIrisDirection(landmarks, leftIris, rightIris) {
+    if (!leftIris || !rightIris) {
+      return { yaw: 0, pitch: 0 };
+    }
+
+    // Referência: cantos externos dos olhos
+    const leftEyeCorner = landmarks[33];
+    const rightEyeCorner = landmarks[263];
+
+    if (!leftEyeCorner || !rightEyeCorner) {
+      return { yaw: 0, pitch: 0 };
+    }
+
+    // Calcular yaw (horizontal) baseado na posição relativa da íris
+    const leftYaw = Math.atan2(leftIris.y - leftEyeCorner.y, leftIris.x - leftEyeCorner.x) * (180 / Math.PI);
+    const rightYaw = Math.atan2(rightIris.y - rightEyeCorner.y, rightIris.x - rightEyeCorner.x) * (180 / Math.PI);
+    const yaw = (leftYaw + rightYaw) / 2;
+
+    // Pitch (vertical) aproximado pela posição Y da íris
+    const pitch = ((leftIris.y + rightIris.y) / 2 - 0.5) * 180;
+
+    return { yaw, pitch };
   }
 }

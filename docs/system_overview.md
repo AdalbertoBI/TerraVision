@@ -90,6 +90,16 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 - Sub-canvas de 240×120px dedicado renderiza ROI ampliado sem afetar preview principal.
 - Melhora precisão da detecção de features oculares e tracking de pupila.
 - Processamento via `tracker.processVideo(roiCanvas)` após cada frame do Face Mesh.
+- **Contrast enhancement aplicado:** Aumento de contraste e brilho (1.5×/1.1×) na ROI para melhorar detecção em condições de baixa iluminação.
+- Conversão para escala de cinza na ROI processada otimiza análise de landmarks oculares.
+
+**Direção da Íris com refineLandmarks:**
+
+- MediaPipe Face Mesh em modo `refineLandmarks: true` fornece landmarks precisos da íris (468-476).
+- Cálculo de yaw (horizontal) e pitch (vertical) baseado em posição relativa da íris aos cantos dos olhos.
+- Método `computeIrisDirection()` retorna vetores angulares (graus) para ajuste fino de gaze.
+- Landmarks da íris (LEFT_IRIS_INDICES: 468-471, RIGHT_IRIS_INDICES: 473-476) usados para posição central.
+- Permite refinamento futuro de predições considerando direção do olhar além de posição da cabeça.
 
 **Throttling de Cliques:**
 
