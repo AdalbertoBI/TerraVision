@@ -8,6 +8,9 @@ export class AudioEngine {
     this.masterGain.gain.value = 0.45;
     this.masterGain.connect(this.context.destination);
 
+    // Resume AudioContext no primeiro gesto do usuário
+    this.setupGestureResume();
+
     this.volumeStates = [
       { id: 'mute', gain: 0, icon: '🔇', message: 'Áudio silenciado' },
       { id: 'low', gain: 0.18, icon: '🔈', message: 'Volume baixo' },
@@ -18,6 +21,24 @@ export class AudioEngine {
     const persisted = localStorage.getItem(APP_CONFIG.volumeStorageKey);
     this.volumeIndex = persisted ? Number(persisted) % this.volumeStates.length : 2;
     this.applyVolume();
+  }
+
+  setupGestureResume() {
+    const resumeOnce = () => {
+      if (this.context.state === 'suspended') {
+        this.context.resume().then(() => {
+          console.log('[AudioEngine] AudioContext resumed após gesto do usuário');
+        }).catch((error) => {
+          console.warn('[AudioEngine] Falha ao resumir AudioContext:', error);
+        });
+      }
+    };
+
+    // Resume no primeiro clique
+    document.addEventListener('click', resumeOnce, { once: true });
+    // Fallback para outros gestos
+    document.addEventListener('touchstart', resumeOnce, { once: true });
+    document.addEventListener('keydown', resumeOnce, { once: true });
   }
 
   applyVolume() {

@@ -40,6 +40,22 @@ TerraVision é uma aplicação client-side em HTML5, CSS3 e JavaScript modular. 
 
 ### Melhorias de Calibração e Precisão (Outubro 2025)
 
+**Cursor de Gaze Persistente e Fluido:**
+
+- Cursor vermelho customizado (`#gaze-cursor`) sempre visível durante o rastreamento.
+- Gerenciamento de estado via atributo `data-active` para controle de opacidade.
+- Cursor mantém-se em tela mesmo quando gaze é perdido temporariamente (move para fora da viewport).
+- Estilos CSS otimizados com transições suaves (0.18s) para movimento fluido.
+- Cor e sombra adaptativas: vermelho para gaze normal, amarelo para baixa confiança.
+
+**AudioContext com Gesture Resume:**
+
+- AudioContext automaticamente resumido no primeiro gesto do usuário (clique, touch, tecla).
+- Listeners `{ once: true }` para evitar múltiplas execuções.
+- Logging detalhado para debug de estado do AudioContext.
+- Fallback para múltiplos tipos de gestos garantindo compatibilidade cross-browser.
+- Elimina aviso "AudioContext was not allowed to start" em navegadores modernos.
+
 **Persistência de Modelo com localStorage:**
 
 - Implementado salvamento automático do modelo WebGazer após cada clique de calibração usando `saveModelToLocalStorage()`.

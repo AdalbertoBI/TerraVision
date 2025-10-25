@@ -113,11 +113,15 @@ export class UIManager {
       return;
     }
     if (!point) {
-      delete this.gazeCursorEl.dataset.active;
+      // Mantém cursor visível mesmo sem ponto, apenas move para fora da tela
+      this.gazeCursorEl.style.left = '-100px';
+      this.gazeCursorEl.style.top = '-100px';
+      this.gazeCursorEl.dataset.active = 'false';
       delete this.gazeCursorEl.dataset.quality;
       return;
     }
 
+    // Cursor sempre visível quando há ponto
     this.gazeCursorEl.style.left = `${point.x}px`;
     this.gazeCursorEl.style.top = `${point.y}px`;
     this.gazeCursorEl.dataset.active = 'true';

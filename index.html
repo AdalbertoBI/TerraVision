@@ -17,10 +17,11 @@
     <body>
         <div
             id="gaze-cursor"
-            style="position: fixed; width: 20px; height: 20px; background: rgba(255,0,0,0.7); border-radius: 50%; pointer-events: none; z-index: 1000; display: none; left: 0; top: 0; transform: translate(-50%, -50%);"
+            style="position: fixed; width: 20px; height: 20px; background: rgba(255,0,0,0.7); border-radius: 50%; pointer-events: none; z-index: 1000; display: block; left: 0; top: 0; transform: translate(-50%, -50%);"
             aria-hidden="true"
+            data-active="false"
         ></div>
-        <canvas id="roi-canvas" width="240" height="120" aria-hidden="true"></canvas>
+        <canvas id="roi-canvas" width="240" height="120" style="display:none;" aria-hidden="true"></canvas>
         <noscript>
             <div class="noscript" role="alert">
                 Ative o JavaScript para utilizar o Terra Vision com rastreamento ocular.
