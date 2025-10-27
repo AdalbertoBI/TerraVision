@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self';">
+    <meta name="description" content="TerraVision Desktop — Interface terapêutica com eye-tracking adaptativo e aprendizado de máquina." />
+    <title>TerraVision Desktop · Eye Tracking Terapêutico Inteligente</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%2305182b'/%3E%3Cpath d='M16 8a9 9 0 1 0 9 9 9 9 0 0 0-9-9zm0 14a5 5 0 1 1 5-5 5 5 0 0 1-5 5z' fill='%234fc3f7'/%3E%3Ccircle cx='16' cy='17' r='2.5' fill='%23fbc02d'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="../style.css" />
+    <style>
+        /* Estilos específicos Electron */
+        body {
+            -webkit-app-region: no-drag;
+            user-select: none;
+            overflow: hidden;
+        }
+        
+        .electron-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: #4fc3f7;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-family: monospace;
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .electron-status .indicator {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .electron-status .indicator::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .ml-info {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fbc02d;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 2000;
+            max-width: 300px;
+        }
+        
+        .ml-info .status-item {
+            margin: 4px 0;
+        }
+    </style>
+</head>
+<body>
+    <!-- Cursor de gaze -->
+    <div
+        id="gaze-cursor"
+        style="position: fixed; width: 20px; height: 20px; background: rgba(79, 195, 247, 0.8); border-radius: 50%; pointer-events: none; z-index: 1000; display: block; left: 0; top: 0; transform: translate(-50%, -50%); box-shadow: 0 0 10px rgba(79, 195, 247, 0.6);"
+        aria-hidden="true"
+        data-active="false"
+    ></div>
+
+    <!-- Canvas ROI para processamento otimizado dos olhos -->
+    <canvas id="roi-canvas" width="240" height="120" style="display:none;" aria-hidden="true"></canvas>
+
+    <!-- Indicador de status Electron -->
+    <div class="electron-status" id="electron-status">
+        <div class="indicator">
+            <span>Electron Desktop</span>
+        </div>
+        <div style="font-size: 10px; color: #888;">
+            <div>📹 Câmera: <span id="camera-status">Inicializando...</span></div>
+            <div>🧠 ML Model: <span id="ml-status">Carregando...</span></div>
+            <div>🎵 Áudio: <span id="audio-status">Pronto</span></div>
+            <div>⚡ FPS: <span id="fps-counter">0</span></div>
+        </div>
+    </div>
+
+    <!-- Informações de ML -->
+    <div class="ml-info" id="ml-info" style="display: none;">
+        <div style="font-weight: bold; margin-bottom: 6px;">🤖 Modelo Adaptativo</div>
+        <div class="status-item">Samples: <span id="sample-count">0</span></div>
+        <div class="status-item">Precisão: <span id="accuracy">0%</span></div>
+        <div class="status-item">Último treino: <span id="last-training">Nunca</span></div>
+    </div>
+
+    <noscript>
+        <div class="noscript" role="alert">
+            Erro crítico: JavaScript desabilitado. O TerraVision Desktop requer JavaScript.
+        </div>
+    </noscript>
+
+    <!-- Stage principal -->
+    <main class="stage" aria-label="Pizza musical interativa">
+        <canvas id="pizza-canvas" aria-label="Pizza com notas musicais" role="img"></canvas>
+        <canvas id="heatmap-canvas" aria-hidden="true"></canvas>
+        
+        <div class="stage-center">
+            <video
+                id="webcam"
+                autoplay
+                muted
+                playsinline
+                width="640"
+                height="480"
+                aria-label="Pré-visualização da câmera frontal"
+            ></video>
+        </div>
+        
+        <div id="gaze-dot" aria-hidden="true"></div>
+    </main>
+
+    <!-- Animação de olho -->
+    <div
+        id="animated-eye-container"
+        style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 500; display: none;"
+        aria-hidden="true"
+    >
+        <svg viewBox="-50 0 350 235" width="200" height="150" preserveAspectRatio="xMidYMid meet">
+            <defs>
+                <radialGradient id="eyeball-gradient">
+                    <stop offset="60%" stop-color="#dcdae0" />
+                    <stop offset="100%" stop-color="#a8a7ad" />
+                </radialGradient>
+                <radialGradient id="pupil-gradient" cx="0.35" cy="0.35" r="0.65">
+                    <stop offset="0%" stop-color="#444" />
+                    <stop offset="75%" stop-color="#000" />
+                    <stop offset="100%" stop-color="#000" />
+                </radialGradient>
+                <filter id="pupil-blur"><feGaussianBlur stdDeviation="0.75" /></filter>
+            </defs>
+            <ellipse cx="131" cy="117.5" rx="100" ry="65" fill="url(#eyeball-gradient)" />
+            <g id="pupil-group">
+                <ellipse id="pupil" cx="131" cy="117.5" rx="50" ry="50" fill="url(#pupil-gradient)" filter="url(#pupil-blur)" />
+                <circle id="pupil-reflection" cx="111" cy="102.5" r="5" fill="white" />
+                <circle id="pupil-reflection-small" cx="124" cy="102.5" r="3" fill="white" />
+            </g>
+            <path id="upper-eyelid" d="M128.5 53.5C59.3 55.5 33 99.6667 28.5 121.5H0V0L261.5 0V121.5H227.5C214.7 65.1 156.167 52.6667 128.5 53.5Z" fill="#000" />
+            <path id="lower-eyelid" d="M128.5 181C59.3 179 33 134.833 28.5 113H0V234.5H261.5V113H227.5C214.7 169.4 156.167 181.833 128.5 181Z" fill="#000" />
+        </svg>
+    </div>
+
+    <!-- Status bar -->
+    <section id="status" class="status-bar" role="status" aria-live="polite" aria-atomic="true">
+        <span id="status-text">
+            🎯 Clique na pizza onde você está olhando para calibrar o sistema ML. Piscadas reforçam o aprendizado adaptativo.
+        </span>
+    </section>
+
+    <!-- Scripts de inicialização Electron -->
+    <script>
+        // Verificar ambiente Electron
+        if (!window.electronAPI) {
+            console.error('❌ Electron API não disponível! Execute via npm start');
+            document.getElementById('status-text').textContent = 
+                'Erro: Execute via "npm start" no diretório electron-app';
+        } else {
+            console.log('✅ Electron API disponível');
+            console.log('📊 Platform:', window.electronAPI.platform);
+            console.log('📊 Versions:', window.electronAPI.versions);
+        }
+
+        // FPS counter
+        let lastTime = performance.now();
+        let frames = 0;
+        function updateFPS() {
+            frames++;
+            const now = performance.now();
+            if (now >= lastTime + 1000) {
+                const fps = Math.round((frames * 1000) / (now - lastTime));
+                document.getElementById('fps-counter').textContent = fps;
+                frames = 0;
+                lastTime = now;
+            }
+            requestAnimationFrame(updateFPS);
+        }
+        requestAnimationFrame(updateFPS);
+    </script>
+
+    <!-- Carregar módulos principais -->
+    <script src="src/ml_model.js" type="module"></script>
+    <script src="src/audio_engine.js" type="module"></script>
+    <script src="src/main.js" type="module"></script>
+</body>
+</html>
