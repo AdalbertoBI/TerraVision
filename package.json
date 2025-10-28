@@ -5,11 +5,7 @@
   "main": "index.html",
   "type": "module",
   "scripts": {
-    "start": "python -m http.server 8000",
-    "start:3000": "python -m http.server 3000",
-    "setup": "bash setup-webgazer.sh",
-    "quickstart": "bash quickstart.sh",
-    "dev": "python server.py 8000"
+    "start": "npx http-server -p 8000 -o index.html"
   },
   "keywords": [
     "eye-tracking",
@@ -20,18 +16,19 @@
     "music",
     "accessibility",
     "html5",
-    "javascript"
+    "javascript",
+    "machine-learning"
   ],
   "author": "Terra Vision Team",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/terra-vision.git"
+    "url": "https://github.com/AdalbertoInterprise/TerraVision.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/terra-vision/issues"
+    "url": "https://github.com/AdalbertoInterprise/TerraVision/issues"
   },
-  "homepage": "https://github.com/yourusername/terra-vision#readme",
+  "homepage": "https://github.com/AdalbertoInterprise/TerraVision",
   "engines": {
     "node": ">=14.0.0"
   },
@@ -39,14 +36,10 @@
     "> 1%",
     "last 2 versions",
     "not dead",
-    "not IE <= 11",
-    "supports webgpu"
+    "not IE <= 11"
   ],
   "devDependencies": {},
-  "dependencies": {
-    "webgazer": "^0.0.9"
-  },
-  "optionalDependencies": {},
+  "dependencies": {},
   "preferGlobal": false,
   "private": false
 }
